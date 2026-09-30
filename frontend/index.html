@@ -1,0 +1,3611 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CivicLens | Satellite Site Review</title>
+  <meta name="description" content="Combine satellite context and project data for early-stage planning, safety, and conditional BNS review in India.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIINfQ3cZc5vJ5xZ0q9K8K5k4sF0uKxwqJ4=" crossorigin="">
+  <style>
+    :root {
+      --bg-deep:        #060a0f;
+      --bg-panel:       rgba(11, 19, 31, 0.78);
+      --bg-card:        rgba(16, 26, 42, 0.88);
+      --bg-card-hover:  rgba(22, 36, 58, 0.95);
+      --bg-input:       rgba(255, 255, 255, 0.05);
+      --bg-input-focus: rgba(0, 240, 255, 0.08);
+      --border:         rgba(255, 255, 255, 0.10);
+      --border-accent:  rgba(0, 240, 255, 0.35);
+      --border-purple:  rgba(168, 85, 247, 0.35);
+      --accent:         #00f0ff;
+      --accent-glow:    rgba(0, 240, 255, 0.40);
+      --accent-teal:    #00d4c8;
+      --accent-blue:    #38bdf8;
+      --accent-purple:  #a855f7;
+      --accent-coral:   #f97316;
+      --good:           #10b981;
+      --warn:           #f59e0b;
+      --danger:         #ef4444;
+      --text-primary:   #f1f5f9;
+      --text-secondary: #94a3b8;
+      --text-muted:     #64748b;
+      --shadow-sm:      0 4px 12px rgba(0,0,0,0.3);
+      --shadow-md:      0 12px 32px rgba(0,0,0,0.45);
+      --shadow-lg:      0 24px 64px rgba(0,0,0,0.65);
+      --shadow-glow:    0 0 24px rgba(0, 240, 255, 0.25);
+      --radius-sm:      8px;
+      --radius-md:      14px;
+      --radius-lg:      20px;
+      --radius-xl:      28px;
+      --transition:     0.22s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      background: var(--bg-deep);
+      color: var(--text-primary);
+      font: 14.5px/1.6 'Inter', -apple-system, sans-serif;
+      overflow-x: hidden;
+      min-height: 100vh;
+    }
+
+    /* Ambient animated grid & glow background */
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      background-image:
+        linear-gradient(rgba(0, 240, 255, 0.035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 240, 255, 0.035) 1px, transparent 1px);
+      background-size: 48px 48px;
+      animation: grid-drift 24s linear infinite;
+      pointer-events: none;
+    }
+    @keyframes grid-drift {
+      0%   { background-position: 0 0, 0 0; }
+      100% { background-position: 48px 48px, 48px 48px; }
+    }
+    body::after {
+      content: "";
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      background:
+        radial-gradient(circle 800px at 10% 15%, rgba(0, 240, 255, 0.07) 0%, transparent 70%),
+        radial-gradient(circle 700px at 90% 80%, rgba(168, 85, 247, 0.07) 0%, transparent 70%),
+        radial-gradient(circle 600px at 50% 50%, rgba(56, 189, 248, 0.05) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    h1, h2, h3, h4 { font-family: 'Space Grotesk', sans-serif; letter-spacing: -0.02em; }
+    p { margin-top: 0; }
+    ul { list-style: none; padding: 0; }
+
+    /* Shell Layout */
+    .shell {
+      display: grid;
+      grid-template-columns: 280px minmax(0, 1fr);
+      min-height: 100vh;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* Sidebar */
+    aside.sidebar {
+      background: rgba(6, 11, 18, 0.95);
+      border-right: 1px solid var(--border);
+      backdrop-filter: blur(28px);
+      padding: 28px 20px;
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      z-index: 10;
+    }
+    aside.sidebar::before {
+      content: "";
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--accent), var(--accent-purple), transparent);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      text-decoration: none;
+      margin-bottom: 36px;
+    }
+    .brand-text { display: flex; flex-direction: column; }
+    .brand-name {
+      font: 800 21px/1.1 'Space Grotesk', sans-serif;
+      color: var(--text-primary);
+      letter-spacing: -0.03em;
+    }
+    .brand-name span { color: var(--accent); }
+    .brand-tag {
+      font-size: 10.5px;
+      font-weight: 600;
+      letter-spacing: 1.2px;
+      text-transform: uppercase;
+      color: var(--accent-blue);
+      margin-top: 2px;
+    }
+
+    .nav-group-title {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 1.6px;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+      padding-left: 6px;
+    }
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 11px 14px;
+      border-radius: var(--radius-sm);
+      text-decoration: none;
+      color: var(--text-secondary);
+      font-size: 13.5px;
+      font-weight: 500;
+      margin-bottom: 5px;
+      transition: var(--transition);
+      border: 1px solid transparent;
+    }
+    .nav-item:hover, .nav-item:focus {
+      background: rgba(0, 240, 255, 0.08);
+      border-color: rgba(0, 240, 255, 0.20);
+      color: var(--text-primary);
+      transform: translateX(4px);
+    }
+    .nav-item.active {
+      background: rgba(0, 240, 255, 0.12);
+      border-color: var(--border-accent);
+      color: var(--accent);
+    }
+    .nav-badge {
+      width: 24px;
+      height: 24px;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-muted);
+      flex-shrink: 0;
+      transition: var(--transition);
+    }
+    .nav-item:hover .nav-badge, .nav-item.active .nav-badge {
+      background: rgba(0, 240, 255, 0.2);
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+    .nav-info { flex: 1; }
+    .nav-info-title { font-weight: 600; display: block; }
+    .nav-info-sub { font-size: 11px; color: var(--text-muted); font-weight: 400; }
+
+    .sidebar-widget {
+      margin-top: auto;
+      padding-top: 20px;
+      border-top: 1px solid var(--border);
+    }
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      background: rgba(16, 185, 129, 0.12);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      border-radius: 999px;
+      padding: 6px 12px;
+      color: var(--good);
+      font-size: 11.5px;
+      font-weight: 600;
+      width: 100%;
+      margin-bottom: 8px;
+    }
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      background: var(--good);
+      border-radius: 50%;
+      box-shadow: 0 0 8px rgba(16, 185, 129, 0.8);
+      animation: pulse-dot 2s ease infinite;
+    }
+    @keyframes pulse-dot {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.6); }
+      50%       { box-shadow: 0 0 0 5px rgba(16, 185, 129, 0); }
+    }
+    .sidebar-caption {
+      font-size: 11.5px;
+      color: var(--text-muted);
+      line-height: 1.4;
+      padding-left: 2px;
+    }
+
+    /* Main Area */
+    main.main-content {
+      padding: 40px clamp(20px, 4vw, 64px) 100px;
+      max-width: 1440px;
+      width: 100%;
+    }
+
+    /* Hero Header */
+    .hero-banner {
+      display: grid;
+      grid-template-columns: minmax(0, 1.4fr) minmax(280px, 0.8fr);
+      gap: 36px;
+      align-items: center;
+      margin-bottom: 48px;
+      padding-bottom: 36px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .pill-eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(0, 240, 255, 0.10);
+      border: 1px solid var(--border-accent);
+      border-radius: 999px;
+      padding: 6px 14px;
+      font-size: 11.5px;
+      font-weight: 700;
+      letter-spacing: 1.2px;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 16px;
+    }
+    .pill-eyebrow::before {
+      content: "";
+      width: 6px;
+      height: 6px;
+      background: var(--accent);
+      border-radius: 50%;
+      box-shadow: 0 0 8px var(--accent);
+    }
+    .hero-title {
+      font-size: clamp(2.2rem, 3.8vw, 3.4rem);
+      line-height: 1.08;
+      font-weight: 800;
+      margin-bottom: 16px;
+    }
+    .hero-title span.grad {
+      background: linear-gradient(135deg, #00f0ff 0%, #38bdf8 50%, #a855f7 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .hero-desc {
+      color: var(--text-secondary);
+      font-size: 15.5px;
+      max-width: 680px;
+      line-height: 1.6;
+      margin-bottom: 22px;
+    }
+    .pill-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .pill-tag {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.10);
+      border-radius: 8px;
+      padding: 4px 10px;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-secondary);
+    }
+    .pill-tag.glow {
+      background: rgba(0, 240, 255, 0.08);
+      border-color: rgba(0, 240, 255, 0.25);
+      color: var(--accent);
+    }
+
+    .hero-stat-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 24px;
+      backdrop-filter: blur(20px);
+      box-shadow: var(--shadow-md);
+      position: relative;
+      overflow: hidden;
+    }
+    .hero-stat-card::after {
+      content: "";
+      position: absolute;
+      top: -50%; right: -50%;
+      width: 200%; height: 200%;
+      background: radial-gradient(circle at 75% 25%, rgba(0, 240, 255, 0.08) 0%, transparent 60%);
+      pointer-events: none;
+    }
+    .hero-stat-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    .stat-box {
+      padding: 14px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: var(--radius-md);
+    }
+    .stat-val {
+      font: 800 26px/1 'Space Grotesk', sans-serif;
+      color: var(--text-primary);
+      margin-bottom: 4px;
+    }
+    .stat-val.teal { color: var(--accent); }
+    .stat-val.purple { color: var(--accent-purple); }
+    .stat-val.blue { color: var(--accent-blue); }
+    .stat-lbl {
+      font-size: 11.5px;
+      color: var(--text-muted);
+      line-height: 1.35;
+    }
+
+    /* Section Titles */
+    .section-headline {
+      margin-bottom: 24px;
+    }
+    .section-headline h2 {
+      font-size: 1.8rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: 6px;
+    }
+    .section-headline p {
+      color: var(--text-secondary);
+      font-size: 14px;
+    }
+
+    /* Pan-India Satellite Inspection Section */
+    .satellite-section {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-xl);
+      padding: 30px;
+      backdrop-filter: blur(28px);
+      box-shadow: var(--shadow-lg);
+      margin-bottom: 56px;
+      position: relative;
+    }
+    .satellite-section::before {
+      content: "";
+      position: absolute;
+      top: 0; left: 40px; right: 40px;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--accent), var(--accent-purple), transparent);
+    }
+
+    /* Search & Filter Bar */
+    .search-filter-hub {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .search-main-row {
+      display: grid;
+      grid-template-columns: 1fr auto auto;
+      gap: 12px;
+      align-items: center;
+    }
+    .search-input-box {
+      position: relative;
+    }
+    .search-input-box input {
+      width: 100%;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 13px 18px 13px 44px;
+      font: 14.5px 'Inter', sans-serif;
+      color: var(--text-primary);
+      transition: var(--transition);
+      outline: none;
+    }
+    .search-input-box input:focus {
+      background: var(--bg-input-focus);
+      border-color: var(--accent);
+      box-shadow: 0 0 16px rgba(0, 240, 255, 0.25);
+    }
+    .search-icon-symbol {
+      position: absolute;
+      left: 15px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 17px;
+      color: var(--text-muted);
+      pointer-events: none;
+    }
+    .btn-search {
+      background: linear-gradient(135deg, #00f0ff, #0284c7);
+      border: none;
+      border-radius: var(--radius-md);
+      padding: 13px 22px;
+      font: 700 14px 'Space Grotesk', sans-serif;
+      color: #030a12;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow: 0 0 20px rgba(0, 240, 255, 0.35);
+      transition: var(--transition);
+      white-space: nowrap;
+    }
+    .btn-search:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 0 28px rgba(0, 240, 255, 0.55);
+    }
+    .btn-locate {
+      background: rgba(255, 255, 255, 0.07);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 13px 18px;
+      font: 600 13px 'Inter', sans-serif;
+      color: var(--text-primary);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: var(--transition);
+      white-space: nowrap;
+    }
+    .btn-locate:hover {
+      background: rgba(0, 240, 255, 0.12);
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    /* City Quick Jump Pills */
+    .city-presets-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .preset-label {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-right: 4px;
+    }
+    .city-chip {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 999px;
+      padding: 5px 12px;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: var(--transition);
+    }
+    .city-chip:hover {
+      background: rgba(0, 240, 255, 0.12);
+      border-color: rgba(0, 240, 255, 0.35);
+      color: var(--accent);
+      transform: translateY(-1px);
+    }
+
+    /* Coordinates Bar */
+    .coord-bar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      background: rgba(0, 0, 0, 0.25);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: var(--radius-md);
+      padding: 10px 16px;
+      font-size: 12.5px;
+      color: var(--text-secondary);
+    }
+    .coord-field {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .coord-field label {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--text-muted);
+    }
+    .coord-field input {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 5px 10px;
+      font: 12.5px monospace;
+      color: var(--text-primary);
+      width: 110px;
+      outline: none;
+    }
+    .coord-field input:focus {
+      border-color: var(--accent);
+    }
+    .btn-coord-go {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 5px 12px;
+      font: 600 12px 'Inter', sans-serif;
+      color: var(--text-primary);
+      cursor: pointer;
+      transition: var(--transition);
+    }
+    .btn-coord-go:hover {
+      background: var(--accent);
+      color: #000;
+    }
+    .coord-hint {
+      margin-left: auto;
+      font-size: 11.5px;
+      color: var(--accent-teal);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* Map & Inspector Grid */
+    .map-workbench-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.45fr) minmax(320px, 0.85fr);
+      gap: 22px;
+      margin-bottom: 24px;
+    }
+
+    /* Map Container */
+    .map-frame {
+      position: relative;
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--border);
+      overflow: hidden;
+      box-shadow: var(--shadow-md);
+      background: #090e15;
+      min-height: 520px;
+      height: 580px;
+    }
+    #inspection-map {
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+    }
+
+    /* Map HUD Overlays */
+    .map-layer-selector {
+      position: absolute;
+      top: 14px;
+      left: 14px;
+      z-index: 500;
+      background: rgba(10, 18, 30, 0.90);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 5px;
+      display: flex;
+      gap: 4px;
+      backdrop-filter: blur(16px);
+      box-shadow: var(--shadow-sm);
+    }
+    .layer-btn {
+      background: transparent;
+      border: none;
+      border-radius: 8px;
+      padding: 6px 12px;
+      font: 600 11.5px 'Space Grotesk', sans-serif;
+      color: var(--text-secondary);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: var(--transition);
+    }
+    .layer-btn:hover {
+      color: var(--text-primary);
+      background: rgba(255, 255, 255, 0.06);
+    }
+    .layer-btn.active {
+      background: rgba(0, 240, 255, 0.20);
+      color: var(--accent);
+      border: 1px solid rgba(0, 240, 255, 0.40);
+    }
+
+    /* Measurement Toolbar Overlay */
+    .map-tools-selector {
+      position: absolute;
+      top: 14px;
+      right: 14px;
+      z-index: 500;
+      background: rgba(10, 18, 30, 0.90);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 5px;
+      display: flex;
+      gap: 5px;
+      backdrop-filter: blur(16px);
+      box-shadow: var(--shadow-sm);
+    }
+    .tool-btn {
+      background: transparent;
+      border: none;
+      border-radius: 8px;
+      padding: 6px 11px;
+      font: 600 11.5px 'Space Grotesk', sans-serif;
+      color: var(--text-secondary);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: var(--transition);
+    }
+    .tool-btn:hover {
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--text-primary);
+    }
+    .tool-btn.active {
+      background: rgba(168, 85, 247, 0.25);
+      border: 1px solid var(--accent-purple);
+      color: #d8b4fe;
+    }
+
+    /* Floating Status HUD */
+    .map-status-hud {
+      position: absolute;
+      bottom: 14px;
+      left: 14px;
+      z-index: 500;
+      background: rgba(8, 14, 24, 0.88);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 8px 14px;
+      font-size: 11.5px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      backdrop-filter: blur(16px);
+      color: var(--text-secondary);
+    }
+    .hud-indicator {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .hud-val {
+      font-weight: 700;
+      color: var(--text-primary);
+      font-family: monospace;
+    }
+
+    /* Radius Pill Bar */
+    .map-radius-selector {
+      position: absolute;
+      bottom: 14px;
+      right: 14px;
+      z-index: 500;
+      background: rgba(10, 18, 30, 0.90);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 4px;
+      display: flex;
+      gap: 4px;
+      backdrop-filter: blur(16px);
+    }
+    .radius-btn {
+      background: transparent;
+      border: none;
+      border-radius: 6px;
+      padding: 5px 9px;
+      font: 600 11px monospace;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: var(--transition);
+    }
+    .radius-btn:hover { color: var(--text-primary); }
+    .radius-btn.active {
+      background: rgba(0, 240, 255, 0.2);
+      color: var(--accent);
+      font-weight: 700;
+    }
+
+    /* Measure Output Floating Card */
+    .measure-badge-card {
+      position: absolute;
+      top: 64px;
+      right: 14px;
+      z-index: 500;
+      background: rgba(15, 23, 42, 0.95);
+      border: 1px solid var(--accent-purple);
+      border-radius: var(--radius-md);
+      padding: 12px 16px;
+      width: 250px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+      backdrop-filter: blur(20px);
+      display: none;
+    }
+    .measure-badge-card.visible { display: block; }
+    .measure-title {
+      font: 700 12px 'Space Grotesk', sans-serif;
+      color: #d8b4fe;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .measure-val {
+      font: 800 20px 'Space Grotesk', sans-serif;
+      color: var(--text-primary);
+      margin-bottom: 4px;
+    }
+    .measure-sub {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-bottom: 10px;
+    }
+    .btn-apply-measure {
+      background: linear-gradient(135deg, #a855f7, #6366f1);
+      border: none;
+      border-radius: 8px;
+      padding: 7px 12px;
+      font: 700 11.5px 'Space Grotesk', sans-serif;
+      color: #fff;
+      cursor: pointer;
+      width: 100%;
+      transition: var(--transition);
+    }
+    .btn-apply-measure:hover {
+      box-shadow: 0 0 16px rgba(168, 85, 247, 0.5);
+    }
+
+    /* Inspector Side Panel */
+    .inspector-panel {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 22px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      overflow-y: auto;
+      max-height: 580px;
+    }
+    .inspector-card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      padding-bottom: 12px;
+    }
+    .inspector-card-header h3 {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .selected-site-box {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: var(--radius-md);
+      padding: 14px;
+    }
+    .site-addr-title {
+      font: 700 14px 'Space Grotesk', sans-serif;
+      color: var(--text-primary);
+      margin-bottom: 6px;
+      line-height: 1.35;
+    }
+    .site-addr-detail {
+      font-size: 12px;
+      color: var(--text-muted);
+      line-height: 1.5;
+      margin-bottom: 10px;
+    }
+    .site-tag-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 12px;
+    }
+    .site-tag {
+      background: rgba(0, 240, 255, 0.08);
+      border: 1px solid rgba(0, 240, 255, 0.2);
+      border-radius: 6px;
+      padding: 3px 8px;
+      font-size: 11px;
+      color: var(--accent);
+      font-weight: 600;
+    }
+    .btn-apply-form {
+      background: rgba(0, 240, 255, 0.15);
+      border: 1px solid var(--accent);
+      border-radius: 8px;
+      padding: 8px 12px;
+      font: 700 12px 'Space Grotesk', sans-serif;
+      color: var(--accent);
+      cursor: pointer;
+      width: 100%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: var(--transition);
+    }
+    .btn-apply-form:hover {
+      background: var(--accent);
+      color: #000;
+      box-shadow: 0 0 16px rgba(0, 240, 255, 0.4);
+    }
+
+    /* Building Details Section */
+    .building-info-box {
+      font-size: 12.5px;
+    }
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 6px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    }
+    .info-lbl { color: var(--text-muted); }
+    .info-val { font-weight: 600; color: var(--text-primary); text-align: right; }
+
+    /* Tracked Sites */
+    .tracked-sites-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      max-height: 150px;
+      overflow-y: auto;
+    }
+    .tracked-chip {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 8px;
+      padding: 8px 10px;
+      text-align: left;
+      cursor: pointer;
+      transition: var(--transition);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .tracked-chip:hover {
+      background: rgba(0, 240, 255, 0.08);
+      border-color: rgba(0, 240, 255, 0.25);
+    }
+    .tracked-name { font-weight: 600; font-size: 12px; color: var(--text-primary); }
+    .tracked-coords { font-size: 10.5px; color: var(--text-muted); font-family: monospace; }
+
+    /* Satellite AI & Spatial Intelligence Analysis Panel */
+    .ai-intel-panel {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 26px;
+      box-shadow: var(--shadow-md);
+      position: relative;
+      overflow: hidden;
+    }
+    .ai-intel-panel::before {
+      content: "";
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, var(--accent), var(--accent-purple));
+    }
+    .ai-header-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+    .ai-title-wrap {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .ai-spark-icon {
+      width: 36px;
+      height: 36px;
+      background: linear-gradient(135deg, rgba(0, 240, 255, 0.2), rgba(168, 85, 247, 0.2));
+      border: 1px solid var(--border-accent);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      color: var(--accent);
+    }
+    .ai-title-wrap h3 {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+    .ai-title-wrap p {
+      font-size: 12.5px;
+      color: var(--text-muted);
+      margin: 0;
+    }
+    .btn-run-ai {
+      background: linear-gradient(135deg, #00f0ff, #a855f7);
+      border: none;
+      border-radius: var(--radius-md);
+      padding: 11px 22px;
+      font: 700 13.5px 'Space Grotesk', sans-serif;
+      color: #050a12;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow: 0 0 24px rgba(0, 240, 255, 0.35);
+      transition: var(--transition);
+    }
+    .btn-run-ai:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 0 32px rgba(168, 85, 247, 0.55);
+    }
+    .btn-run-ai:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .ai-content-grid {
+      display: grid;
+      grid-template-columns: 280px minmax(0, 1fr);
+      gap: 24px;
+      align-items: start;
+    }
+    .satellite-preview-card {
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .satellite-snapshot-img {
+      width: 100%;
+      height: 240px;
+      object-fit: cover;
+      display: block;
+      background: #000;
+    }
+    .snapshot-meta {
+      padding: 10px 14px;
+      font-size: 11.5px;
+      color: var(--text-muted);
+      border-top: 1px solid rgba(255, 255, 255, 0.05);
+      display: flex;
+      justify-content: space-between;
+    }
+    .ai-report-body {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: var(--radius-md);
+      padding: 20px;
+      font-size: 13.5px;
+      line-height: 1.65;
+      color: var(--text-secondary);
+    }
+    .ai-report-body strong { color: var(--text-primary); }
+    .ai-disclaimer-box {
+      margin-top: 14px;
+      padding: 10px 14px;
+      background: rgba(245, 158, 11, 0.08);
+      border: 1px solid rgba(245, 158, 11, 0.25);
+      border-radius: 8px;
+      font-size: 11.5px;
+      color: #fbbf24;
+      line-height: 1.45;
+    }
+
+    /* Proposal Feasibility Form Grid */
+    .form-panel-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      margin-bottom: 24px;
+    }
+    .form-panel-full {
+      grid-column: span 2;
+    }
+    .panel-box {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 26px;
+      backdrop-filter: blur(24px);
+      box-shadow: var(--shadow-sm);
+    }
+    .panel-box-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    .panel-num-icon {
+      width: 38px;
+      height: 38px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font: 700 15px 'Space Grotesk', sans-serif;
+      flex-shrink: 0;
+    }
+    .panel-num-icon.teal { background: rgba(0, 240, 255, 0.15); color: var(--accent); border: 1px solid rgba(0, 240, 255, 0.3); }
+    .panel-num-icon.blue { background: rgba(56, 189, 248, 0.15); color: var(--accent-blue); border: 1px solid rgba(56, 189, 248, 0.3); }
+    .panel-num-icon.purple { background: rgba(168, 85, 247, 0.15); color: var(--accent-purple); border: 1px solid rgba(168, 85, 247, 0.3); }
+
+    .panel-box-header h3 {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+    .panel-box-header p {
+      font-size: 12.5px;
+      color: var(--text-muted);
+      margin: 0;
+    }
+
+    .form-fields-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    .field-full { grid-column: span 2; }
+    .field-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .field-group label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .field-group label span.import-btn {
+      font-size: 10.5px;
+      color: var(--accent);
+      cursor: pointer;
+      text-decoration: underline;
+    }
+    .field-group input, .field-group select {
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 10px 14px;
+      font: 14px 'Inter', sans-serif;
+      color: var(--text-primary);
+      outline: none;
+      transition: var(--transition);
+      width: 100%;
+    }
+    .field-group input:focus, .field-group select:focus {
+      background: var(--bg-input-focus);
+      border-color: var(--accent);
+      box-shadow: 0 0 14px rgba(0, 240, 255, 0.2);
+    }
+    .field-group select option {
+      background: #0f172a;
+      color: #fff;
+    }
+
+    .live-search-wrap {
+      position: relative;
+    }
+    .plot-address-list {
+      display: grid;
+      gap: 12px;
+    }
+    .plot-address-block {
+      padding: 15px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      background: rgba(255, 255, 255, 0.025);
+    }
+    .plot-address-heading {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    .plot-address-heading strong {
+      color: var(--text-primary);
+      font: 600 13px 'Space Grotesk', sans-serif;
+    }
+    .plot-address-heading button {
+      border: 0;
+      background: transparent;
+      color: var(--text-muted);
+      font: 600 12px 'Inter', sans-serif;
+      cursor: pointer;
+    }
+    .plot-address-heading button:hover { color: var(--danger); }
+    .plot-address-fields {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(160px, 0.4fr) minmax(170px, 0.4fr);
+      gap: 12px;
+      align-items: end;
+    }
+    .plot-address-fields .field-group { margin: 0; }
+    .add-plot-address {
+      margin-top: 12px;
+      padding: 9px 13px;
+      border: 1px solid var(--border-accent);
+      border-radius: var(--radius-sm);
+      background: rgba(0, 212, 200, 0.07);
+      color: var(--accent-teal);
+      font: 600 12px 'Inter', sans-serif;
+      cursor: pointer;
+      transition: var(--transition);
+    }
+    .add-plot-address:hover { background: rgba(0, 212, 200, 0.14); }
+    .plot-address-note {
+      margin-top: 9px;
+      color: var(--text-muted);
+      font-size: 11.5px;
+    }
+    .address-suggestions-box {
+      position: absolute;
+      top: calc(100% + 4px);
+      left: 0; right: 0;
+      background: #0d1522;
+      border: 1px solid var(--border-accent);
+      border-radius: var(--radius-md);
+      box-shadow: 0 12px 32px rgba(0,0,0,0.7);
+      z-index: 1000;
+      max-height: 240px;
+      overflow-y: auto;
+      display: none;
+    }
+    .address-suggestions-box.visible { display: block; }
+    .suggestion-row {
+      padding: 10px 14px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      cursor: pointer;
+      text-align: left;
+      background: transparent;
+      border-left: none; border-right: none; border-top: none;
+      width: 100%;
+      display: block;
+      transition: var(--transition);
+    }
+    .suggestion-row:hover {
+      background: rgba(0, 240, 255, 0.12);
+    }
+    .suggestion-row strong {
+      display: block;
+      font-size: 13px;
+      color: var(--text-primary);
+    }
+    .suggestion-row small {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .submit-cta-row {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      margin-top: 24px;
+      padding-top: 18px;
+      border-top: 1px solid rgba(255, 255, 255, 0.06);
+    }
+    .btn-submit-assessment {
+      background: linear-gradient(135deg, #00f0ff, #38bdf8);
+      border: none;
+      border-radius: var(--radius-md);
+      padding: 14px 28px;
+      font: 700 15px 'Space Grotesk', sans-serif;
+      color: #030812;
+      cursor: pointer;
+      box-shadow: 0 0 24px rgba(0, 240, 255, 0.4);
+      transition: var(--transition);
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .btn-submit-assessment:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 0 36px rgba(0, 240, 255, 0.6);
+    }
+    .submit-note-text {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    /* Feasibility Results Card */
+    .results-wrap {
+      margin-top: 36px;
+      display: none;
+      animation: fadeUp 0.35s ease;
+    }
+    .results-wrap.visible { display: block; }
+    .violations-page {
+      margin-top: 44px;
+      padding-top: 28px;
+      border-top: 1px solid var(--border);
+      scroll-margin-top: 24px;
+    }
+    .violations-page-summary {
+      margin: 18px 0;
+      color: var(--text-secondary);
+      font-size: 13px;
+    }
+    .violation-plot-group {
+      margin-top: 22px;
+      padding: 18px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      background: #fff;
+    }
+    .violation-plot-heading {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+    }
+    .violation-plot-heading h3 { font-size: 16px; overflow-wrap: anywhere; }
+    .violation-plot-heading p { margin-top: 3px; color: var(--text-muted); font-size: 12px; overflow-wrap: anywhere; }
+    .violation-count-badge {
+      flex: 0 0 auto;
+      padding: 4px 9px;
+      border-radius: 999px;
+      background: #fff3e8;
+      color: #9d4a11;
+      font-size: 11px;
+      font-weight: 700;
+    }
+    .violation-count-badge.clear { background: #edf7ef; color: #17663b; }
+    .violation-action-list { display: grid; gap: 12px; margin-top: 14px; }
+    .violation-action-item { padding: 14px; border-left: 3px solid var(--india-saffron); background: #fbfcfd; }
+    .violation-action-item h4 { font-size: 14px; }
+    .violation-action-item p { margin-top: 5px; color: var(--text-secondary); font-size: 12px; line-height: 1.55; }
+    .violation-action-item h5 { margin-top: 12px; color: var(--india-green); font-size: 11px; text-transform: uppercase; }
+    .violation-action-item ul { margin: 6px 0 0 18px; list-style: disc; color: var(--text-secondary); font-size: 12px; line-height: 1.6; }
+    .violation-law-list { display: grid; gap: 8px; margin-top: 7px; }
+    .violation-law-item { padding: 10px 12px; border: 1px solid #dfe6ef; border-radius: 6px; background: #fff; }
+    .violation-law-item strong { color: var(--india-navy); font-size: 12px; }
+    .violation-law-item p { margin-top: 4px; color: var(--text-secondary); font-size: 12px; line-height: 1.55; }
+    .legal-followup-panel { margin-top: 24px; padding: 18px; border-left: 4px solid var(--india-navy); background: #f5f8fb; }
+    .legal-followup-panel h3 { font-size: 16px; }
+    .legal-followup-panel p { margin-top: 6px; color: var(--text-secondary); font-size: 12px; line-height: 1.6; }
+    .legal-followup-panel ol { margin: 10px 0 0 18px; color: var(--text-secondary); font-size: 12px; line-height: 1.65; }
+    .precedent-reference { margin-top: 28px; padding-top: 20px; border-top: 1px solid var(--border); }
+    .precedent-reference h3 { font-size: 16px; }
+    .precedent-reference-intro, .precedent-reference-note { margin-top: 6px; color: var(--text-muted); font-size: 12px; line-height: 1.55; }
+    .precedent-list { display: grid; gap: 0; margin-top: 12px; }
+    .precedent-list li { padding: 12px 0; border-bottom: 1px solid var(--border); }
+    .precedent-list a { color: var(--india-navy); font-size: 13px; font-weight: 700; text-underline-offset: 2px; }
+    .precedent-list p { margin-top: 4px; color: var(--text-secondary); font-size: 12px; line-height: 1.55; }
+    .violations-empty-state { padding: 20px 0; color: var(--text-muted); font-size: 13px; }
+    .plot-results-block {
+      margin-bottom: 26px;
+      padding: 18px;
+      border: 1px solid var(--border-accent);
+      border-radius: var(--radius-lg);
+      background: rgba(10, 19, 31, 0.72);
+    }
+    .plot-results-heading {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 16px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid var(--border);
+    }
+    .plot-results-heading h3 { font-size: 17px; overflow-wrap: anywhere; }
+    .plot-results-heading p { margin-top: 3px; color: var(--text-muted); font-size: 11px; }
+    .plot-results-number {
+      flex: 0 0 auto;
+      color: var(--accent-teal);
+      font: 700 11px 'Space Grotesk', sans-serif;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+    .plot-result-content > .outcome-card:last-child,
+    .plot-result-content > .bns-panel:last-child { margin-bottom: 0; }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .outcome-card {
+      border-radius: var(--radius-lg);
+      padding: 24px 28px;
+      margin-bottom: 20px;
+      border-left: 6px solid var(--accent);
+      background: var(--bg-card);
+      box-shadow: var(--shadow-md);
+    }
+    .outcome-card.good {
+      background: rgba(16, 185, 129, 0.08);
+      border-left-color: var(--good);
+      border: 1px solid rgba(16, 185, 129, 0.25);
+    }
+    .outcome-card.review {
+      background: rgba(239, 68, 68, 0.08);
+      border-left-color: var(--danger);
+      border: 1px solid rgba(239, 68, 68, 0.25);
+    }
+    .outcome-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+    .outcome-badge-pill {
+      font: 700 12px 'Space Grotesk', sans-serif;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      padding: 5px 12px;
+      border-radius: 999px;
+    }
+    .outcome-badge-pill.good { background: rgba(16, 185, 129, 0.2); color: var(--good); }
+    .outcome-badge-pill.review { background: rgba(239, 68, 68, 0.2); color: var(--danger); }
+    .outcome-heading {
+      font: 800 24px 'Space Grotesk', sans-serif;
+      color: var(--text-primary);
+    }
+    .outcome-subtext {
+      color: var(--text-secondary);
+      font-size: 14.5px;
+    }
+
+    .results-metric-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .res-metric-box {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 18px;
+    }
+    .res-metric-box small {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-muted);
+      display: block;
+      margin-bottom: 6px;
+    }
+    .res-metric-val {
+      font: 800 28px 'Space Grotesk', sans-serif;
+      color: var(--text-primary);
+    }
+    .risk-meter {
+      height: 6px;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 999px;
+      margin: 8px 0;
+      overflow: hidden;
+    }
+    .risk-fill {
+      height: 100%;
+      border-radius: 999px;
+      transition: width 0.6s ease;
+    }
+    .risk-fill.low { background: var(--good); }
+    .risk-fill.med { background: var(--warn); }
+    .risk-fill.high { background: var(--danger); }
+
+    .bench-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    .bench-table td {
+      padding: 8px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    .bench-table td:last-child {
+      text-align: right;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    /* BNS Legal Panel */
+    .bns-panel {
+      border-radius: var(--radius-lg);
+      padding: 26px;
+      margin-top: 24px;
+      margin-bottom: 24px;
+      position: relative;
+      box-shadow: var(--shadow-md);
+      backdrop-filter: blur(24px);
+    }
+    .bns-panel.alert-liability {
+      background: rgba(22, 13, 20, 0.92);
+      border: 1px solid rgba(239, 68, 68, 0.35);
+      border-left: 6px solid #ef4444;
+    }
+    .bns-panel.compliant {
+      background: rgba(10, 24, 20, 0.88);
+      border: 1px solid rgba(16, 185, 129, 0.35);
+      border-left: 6px solid #10b981;
+    }
+    .bns-main-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 14px;
+      margin-bottom: 12px;
+    }
+    .bns-title-wrap {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .bns-gavel-icon {
+      font-size: 24px;
+      background: rgba(255, 255, 255, 0.06);
+      width: 44px;
+      height: 44px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .bns-panel-title {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin: 0;
+    }
+    .bns-panel-subtitle {
+      font-size: 12.5px;
+      color: var(--text-muted);
+      margin: 2px 0 0;
+    }
+    .bns-liability-pill {
+      font: 700 12px 'Space Grotesk', sans-serif;
+      padding: 6px 14px;
+      border-radius: 999px;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+    .bns-liability-pill.liability {
+      background: rgba(239, 68, 68, 0.2);
+      border: 1px solid rgba(239, 68, 68, 0.5);
+      color: #fca5a5;
+    }
+    .bns-liability-pill.compliant {
+      background: rgba(16, 185, 129, 0.2);
+      border: 1px solid rgba(16, 185, 129, 0.5);
+      color: #6ee7b7;
+    }
+    .bns-summary-bar {
+      font-size: 13.5px;
+      color: var(--text-secondary);
+      line-height: 1.5;
+      padding-bottom: 14px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      margin-bottom: 18px;
+    }
+    .bns-infringements-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+    .bns-infringement-card {
+      background: rgba(12, 18, 30, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: var(--radius-md);
+      padding: 20px;
+    }
+    .bns-inf-title-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+    .bns-inf-title-row h4 {
+      font-size: 15px;
+      font-weight: 700;
+      color: #fca5a5;
+      margin: 0;
+    }
+    .bns-viol-tag {
+      font: 600 11px monospace;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      padding: 2px 8px;
+      border-radius: 6px;
+      color: var(--text-muted);
+    }
+    .bns-inf-desc {
+      font-size: 13px;
+      color: var(--text-secondary);
+      margin-bottom: 14px;
+    }
+    .bns-subhead {
+      font-size: 11.5px;
+      font-weight: 700;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      color: #38bdf8;
+      margin-bottom: 10px;
+    }
+    .bns-sections-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+    .bns-sec-item {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 8px;
+      padding: 12px 14px;
+    }
+    .bns-sec-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 6px;
+    }
+    .bns-sec-tag {
+      background: rgba(249, 115, 22, 0.15);
+      border: 1px solid rgba(249, 115, 22, 0.4);
+      color: #fdba74;
+      font: 700 11.5px monospace;
+      padding: 2px 8px;
+      border-radius: 4px;
+    }
+    .bns-sec-name {
+      font-size: 13px;
+      color: var(--text-primary);
+    }
+    .bns-punishment-row {
+      font-size: 12px;
+      margin-bottom: 6px;
+      display: flex;
+      gap: 8px;
+      align-items: baseline;
+    }
+    .bns-punish-badge {
+      font-weight: 700;
+      color: #f87171;
+    }
+    .bns-punish-text {
+      color: var(--text-primary);
+      font-weight: 600;
+    }
+    .bns-rationale {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin: 0;
+      line-height: 1.45;
+    }
+    .bns-two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+    .bns-col-box {
+      background: rgba(0, 0, 0, 0.25);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 8px;
+      padding: 12px;
+    }
+    .bns-subhead-sm {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: var(--text-secondary);
+      margin-bottom: 8px;
+    }
+    .bns-list-clean {
+      font-size: 12px;
+      color: var(--text-secondary);
+      line-height: 1.5;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .bns-list-clean.actions li {
+      color: #fcd34d;
+    }
+    .bns-disclaimer-note {
+      font-size: 11px;
+      color: var(--text-muted);
+      border-top: 1px solid rgba(255, 255, 255, 0.06);
+      padding-top: 14px;
+      margin-top: 18px;
+      line-height: 1.5;
+    }
+
+    /* Toast Notification */
+    .toast-msg {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: #0f172a;
+      border: 1px solid var(--border-accent);
+      border-radius: var(--radius-md);
+      padding: 12px 20px;
+      font: 600 13px 'Inter', sans-serif;
+      color: var(--accent);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+      z-index: 9999;
+      display: none;
+      animation: toastIn 0.25s ease;
+    }
+    .toast-msg.visible { display: block; }
+    @keyframes toastIn {
+      from { transform: translateY(20px); opacity: 0; }
+      to   { transform: translateY(0); opacity: 1; }
+    }
+
+    /* Responsive */
+    @media (max-width: 1024px) {
+      .shell { grid-template-columns: 1fr; }
+      aside.sidebar { display: none; }
+      .hero-banner { grid-template-columns: 1fr; }
+      .map-workbench-grid { grid-template-columns: 1fr; }
+      .ai-content-grid { grid-template-columns: 1fr; }
+      .form-panel-grid { grid-template-columns: 1fr; }
+      .form-panel-full { grid-column: span 1; }
+    }
+
+    /* CivicLens professional workspace theme */
+    :root {
+      --bg-deep: #f3f6fa;
+      --bg-panel: #ffffff;
+      --bg-card: #ffffff;
+      --bg-card-hover: #f8fafc;
+      --bg-input: #f8fafc;
+      --bg-input-focus: #ffffff;
+      --border: #dbe3ed;
+      --border-accent: rgba(37, 99, 235, .34);
+      --border-purple: rgba(93, 86, 211, .25);
+      --india-saffron: #e87524;
+      --india-green: #168249;
+      --india-navy: #17466f;
+      --accent: #168249;
+      --accent-glow: rgba(22, 130, 73, .16);
+      --accent-teal: #168249;
+      --accent-blue: #2563eb;
+      --accent-purple: #e87524;
+      --accent-coral: #bd5a18;
+      --good: #15803d;
+      --warn: #b45309;
+      --danger: #b42318;
+      --text-primary: #172235;
+      --text-secondary: #536276;
+      --text-muted: #768398;
+      --shadow-sm: 0 2px 8px rgba(22, 34, 53, .06);
+      --shadow-md: 0 8px 24px rgba(22, 34, 53, .08);
+      --shadow-lg: 0 16px 40px rgba(22, 34, 53, .08);
+      --shadow-glow: 0 0 0 3px rgba(37, 99, 235, .12);
+    }
+    body { background: #fff; color: var(--text-primary); isolation: isolate; }
+    body::before {
+      display: block;
+      background: linear-gradient(180deg, #fff0e2 0%, #fff8f1 22%, #fff 43%, #fff 62%, #f2f8f2 82%, #e6f2e8 100%);
+      background-size: 100% 100%;
+      animation: none;
+    }
+    body::after { display: none; }
+    .shell {
+      max-width: 1920px;
+      margin: 0 auto;
+      position: relative;
+    }
+    .chakra-center {
+      position: absolute;
+      left: 50%;
+      top: 24px;
+      transform: translateX(-50%);
+      width: 240px;
+      height: 240px;
+      display: grid;
+      place-items: center;
+      pointer-events: none;
+      z-index: 15;
+    }
+    .chakra-center svg {
+      display: block;
+      width: 220px;
+      height: 220px;
+      color: #143b73;
+      filter: drop-shadow(0 10px 22px rgba(20, 59, 115, .18));
+    }
+    main.main-content { padding-top: 220px; }
+    aside.sidebar { background: #fff; border-right-color: var(--border); backdrop-filter: none; }
+    aside.sidebar::before { background: linear-gradient(90deg, var(--india-saffron) 0 33%, #e7edf2 33% 66%, var(--india-green) 66%); }
+    .brand-name span { color: var(--india-green); }
+    .brand-tag { color: var(--india-saffron); }
+    .nav-item:hover, .nav-item:focus { background: #f1f5fb; border-color: #d6e0ee; color: var(--text-primary); transform: none; }
+    .nav-item.active { background: #eef4ff; border-color: #cbdafa; color: #1d4ed8; }
+    .nav-item.active .nav-badge { background: #dce8ff; border-color: #c4d5fa; color: #1d4ed8; }
+    .status-badge { background: #f0f8f3; border-color: #cce8d4; color: #18703c; }
+    .status-dot { background: #219653; box-shadow: none; }
+    .pill-eyebrow { background: #fff6ed; border-color: #f1d5bf; color: #a94e12; letter-spacing: .8px; }
+    .pill-eyebrow::before { background: var(--india-saffron); box-shadow: none; }
+    .hero-title span.grad { background: linear-gradient(120deg, #ce641d, #168249); -webkit-background-clip: text; }
+    .hero-stat-card, .satellite-section, .panel-box, .inspector-panel, .ai-intel-panel,
+    .res-metric-box, .outcome-card, .bns-panel { backdrop-filter: none; }
+    .hero-stat-card { background: #fff; border-color: var(--border); box-shadow: var(--shadow-md); }
+    .hero-stat-card::after { display: none; }
+    .stat-box { background: #f7f9fc; border-color: #e7ecf2; }
+    .stat-val.teal { color: var(--india-green); }
+    .stat-val.purple { color: var(--india-saffron); }
+    .stat-val.blue { color: #2563eb; }
+    .pill-tag { background: #f7f9fc; border-color: #e2e8f0; color: #526174; }
+    .pill-tag.glow { background: #f2f8f3; border-color: #d2e6d7; color: #17663b; }
+    .satellite-section { background: #fff; border-color: var(--border); border-radius: 18px; box-shadow: var(--shadow-lg); }
+    .satellite-section::before { display: none; }
+    .section-headline h2 { font-size: 1.55rem; }
+    .search-input-box input, .coord-field input, .field-group input, .field-group select {
+      background: #f8fafc; border-color: #d8e0ea; color: #172235; box-shadow: none;
+    }
+    .search-input-box input:focus, .coord-field input:focus, .field-group input:focus, .field-group select:focus {
+      background: #fff; border-color: #4d7ed9; box-shadow: 0 0 0 3px rgba(37, 99, 235, .12);
+    }
+    .field-group select option { background: #fff; color: #172235; }
+    .btn-search, .btn-submit-assessment, .btn-run-ai {
+      background: #2456c7; color: #fff; box-shadow: 0 4px 12px rgba(36, 86, 199, .18);
+    }
+    .btn-search:hover, .btn-submit-assessment:hover, .btn-run-ai:hover {
+      background: #1949b2; box-shadow: 0 6px 16px rgba(36, 86, 199, .22); transform: translateY(-1px);
+    }
+    .btn-locate, .city-chip, .btn-coord-go, .tool-btn, .radius-btn {
+      background: #fff; border-color: #dbe3ed; color: #435267;
+    }
+    .btn-locate:hover, .city-chip:hover, .btn-coord-go:hover { background: #f0f5ff; border-color: #b9ccef; color: #2456c7; }
+    .coord-bar { background: #f8fafc; border-color: #e4e9f0; }
+    .map-frame { border-color: #d5dde8; box-shadow: var(--shadow-md); }
+    .inspector-card-header h3, .panel-box-header h3 { color: var(--text-primary); }
+    .selected-site-box, .building-info-box, .tracked-sites-list { background: #f8fafc; border-color: #e3e9f1; }
+    .ai-intel-panel { background: #f8fafc; border-color: #dbe3ed; border-radius: 14px; }
+    .ai-report-body { background: #fff; border-color: #e2e8f0; color: var(--text-secondary); }
+    .ai-disclaimer-box { background: #fffbeb; border-color: #f1dfad; color: #705516; }
+    .satellite-preview-card { border-color: #dce4ee; background: #fff; }
+    .snapshot-meta { color: var(--text-muted); }
+    .panel-box { background: #fff; border-color: var(--border); box-shadow: var(--shadow-sm); }
+    .panel-box-header { border-bottom-color: #e8edf3; }
+    .plot-address-block { background: #f8fafc; border-color: #dbe3ed; }
+    .plot-address-heading button { color: #68778c; }
+    .plot-address-heading button:hover { color: #b42318; }
+    .plot-address-note { color: #68778c; }
+    .add-plot-address { background: #eef7f6; border-color: #c4e2dd; color: #0f766e; }
+    .add-plot-address:hover { background: #e2f2ef; }
+    .address-suggestions-box { background: #fff; border-color: #cbd7e6; box-shadow: 0 12px 28px rgba(22, 34, 53, .14); }
+    .suggestion-row:hover { background: #eef4ff; }
+    .suggestion-row strong { color: #172235; }
+    .suggestion-row small { color: #68778c; }
+    .plot-results-block { background: #f8fafc; border-color: #dbe3ed; }
+    .plot-results-heading { border-bottom-color: #dbe3ed; }
+    .plot-results-number { color: #0f766e; }
+    .panel-num-icon.teal { background: #e8f5f2; color: #0f766e; }
+    .panel-num-icon.blue { background: #edf3ff; color: #2456c7; }
+    .panel-num-icon.purple { background: #f0effb; color: #6558c7; }
+    .submit-cta-row { border-top-color: #e8edf3; }
+    .outcome-card.good { background: #f1f8f3; border-color: #cce8d4; border-left-color: #15803d; }
+    .outcome-card.review { background: #fff8f2; border-color: #f0d9c7; border-left-color: #c25b16; }
+    .outcome-badge-pill.good { background: #e1f1e6; color: #18703c; }
+    .outcome-badge-pill.review { background: #ffeadb; color: #a34208; }
+    .bns-panel.alert-liability, .bns-panel.compliant { background: #fff; border: 1px solid var(--border); border-left: 4px solid #2456c7; }
+    .bns-liability-pill.liability, .bns-liability-pill.compliant { background: #eef4ff; border-color: #d5e1fb; color: #2456c7; }
+    .bns-infringement-card { background: #f8fafc; border-color: #e2e8f0; }
+    .bns-inf-title-row h4 { color: #172235; }
+    .bns-subhead { color: #2456c7; }
+    .bns-sec-item { background: #fff; border-color: #e2e8f0; }
+    .bns-sec-tag { background: #eef4ff; border-color: #d5e1fb; color: #2456c7; }
+    .bns-col-box { background: #fff; border-color: #e2e8f0; }
+    .bns-list-clean.actions li { color: #315840; }
+    .toast-msg { background: #172235; border-color: #31445e; color: #fff; box-shadow: 0 8px 24px rgba(22, 34, 53, .2); }
+    #vision-api-status { font-size: 11px; color: var(--text-muted); margin-top: 8px; line-height: 1.4; }
+    .combined-evidence-card { display: grid; grid-template-columns: minmax(220px, .72fr) minmax(0, 1.28fr); gap: 20px; margin: 18px 0 24px; }
+    .combined-evidence-image, .combined-evidence-copy { background: #fff; border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
+    .combined-evidence-image img { display: block; width: 100%; height: 100%; min-height: 220px; object-fit: cover; background: #e7ecf2; }
+    .combined-evidence-copy { padding: 18px 20px; min-width: 0; }
+    .combined-evidence-copy h3 { font-size: 15px; margin-bottom: 8px; }
+    .combined-evidence-copy p { color: var(--text-secondary); font-size: 13px; line-height: 1.6; }
+    .combined-site-meta { color: var(--text-muted); font-size: 11px; margin: 4px 0 10px; }
+    .result-disclaimer { margin: 18px 0 0; padding: 12px 14px; border-radius: 10px; background: #f5f7fa; color: #59677a; font-size: 12px; line-height: 1.55; }
+    .assessment-input-summary { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 18px; }
+    .assessment-input-summary span { padding: 5px 9px; border-radius: 999px; background: #eef4ff; color: #314c7b; font-size: 11px; }
+    @media (max-width: 760px) {
+      .chakra-center { top: 18px; width: 170px; height: 170px; }
+      .chakra-center svg { width: 150px; height: 150px; }
+      .india-emblem { top: 10px; right: 12px; width: 92px; height: 92px; }
+      .india-emblem svg { width: 72px; height: 72px; }
+      main.main-content { padding: 160px 16px 70px; }
+      .hero-banner { gap: 22px; margin-bottom: 28px; padding-bottom: 24px; }
+      .satellite-section { padding: 18px; }
+      .plot-address-fields { grid-template-columns: 1fr; }
+      .plot-address-block, .plot-results-block { padding: 13px; }
+      .violation-plot-group { padding: 13px; }
+      .violation-plot-heading { flex-direction: column; gap: 8px; }
+      .plot-results-heading { flex-direction: column-reverse; gap: 5px; }
+      .combined-evidence-card { grid-template-columns: 1fr; }
+      .combined-evidence-image img { height: 240px; }
+      .search-main-row { grid-template-columns: 1fr; }
+      .search-main-row button { justify-content: center; }
+      .submit-cta-row { align-items: stretch; flex-direction: column; }
+      .btn-submit-assessment { justify-content: center; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="shell">
+  <div class="chakra-center" aria-hidden="true">
+    <svg viewBox="0 0 80 80" xmlns="http://www.w3.org/2000/svg" aria-label="Ashokan Chakra">
+      <circle cx="40" cy="40" r="33" fill="none" stroke="currentColor" stroke-width="2.4"/>
+      <circle cx="40" cy="40" r="5.5" fill="none" stroke="currentColor" stroke-width="2"/>
+      <defs>
+        <path id="chakra-spoke" d="M40 34.5V8.5" fill="none" stroke="currentColor" stroke-width="1.45"/>
+      </defs>
+      <use href="#chakra-spoke"/>
+      <use href="#chakra-spoke" transform="rotate(15 40 40)"/>
+      <use href="#chakra-spoke" transform="rotate(30 40 40)"/>
+      <use href="#chakra-spoke" transform="rotate(45 40 40)"/>
+      <use href="#chakra-spoke" transform="rotate(60 40 40)"/>
+      <use href="#chakra-spoke" transform="rotate(75 40 40)"/>
+      <use href="#chakra-spoke" transform="rotate(90 40 40)"/>
+      <use href="#chakra-spoke" transform="rotate(105 40 40)"/>
+      <use href="#chakra-spoke" transform="rotate(120 40 40)"/>
+      <use href="#chakra-spoke" transform="rotate(135 40 40)"/>
+      <use href="#chakra-spoke" transform="rotate(150 40 40)"/>
+      <use href="#chakra-spoke" transform="rotate(165 40 40)"/>
+      <use href="#chakra-spoke" transform="rotate(180 40 40)"/>
+      <use href="#chakra-spoke" transform="rotate(195 40 40)"/>
+      <use href="#chakra-spoke" transform="rotate(210 40 40)"/>
+      <use href="#chakra-spoke" transform="rotate(225 40 40)"/>
+      <use href="#chakra-spoke" transform="rotate(240 40 40)"/>
+      <use href="#chakra-spoke" transform="rotate(255 40 40)"/>
+      <use href="#chakra-spoke" transform="rotate(270 40 40)"/>
+      <use href="#chakra-spoke" transform="rotate(285 40 40)"/>
+      <use href="#chakra-spoke" transform="rotate(300 40 40)"/>
+      <use href="#chakra-spoke" transform="rotate(315 40 40)"/>
+      <use href="#chakra-spoke" transform="rotate(330 40 40)"/>
+      <use href="#chakra-spoke" transform="rotate(345 40 40)"/>
+    </svg>
+  </div>
+
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <a class="brand" href="#top">
+      <div class="brand-text">
+        <div class="brand-name">Civic<span>Lens</span></div>
+        <div class="brand-tag">India Spatial AI</div>
+      </div>
+    </a>
+
+    <div class="nav-group-title">Platform Hub</div>
+    <a class="nav-item active" href="#satellite-hub">
+      <div class="nav-badge">01</div>
+      <div class="nav-info">
+        <span class="nav-info-title">Satellite Inspection</span>
+        <span class="nav-info-sub">Pan-India High-Res GIS</span>
+      </div>
+    </a>
+    <a class="nav-item" href="#proposal-form-section">
+      <div class="nav-badge">02</div>
+      <div class="nav-info">
+        <span class="nav-info-title">Feasibility Assessment</span>
+        <span class="nav-info-sub">Compliance & Utility Models</span>
+      </div>
+    </a>
+    <a class="nav-item" href="#results">
+      <div class="nav-badge">03</div>
+      <div class="nav-info">
+        <span class="nav-info-title">Screening Intelligence</span>
+        <span class="nav-info-sub">Benchmark Calculations</span>
+      </div>
+    </a>
+    <a class="nav-item" href="#violations-actions">
+      <div class="nav-badge">04</div>
+      <div class="nav-info">
+        <span class="nav-info-title">Violations &amp; Actions</span>
+        <span class="nav-info-sub">Possible flags and next steps</span>
+      </div>
+    </a>
+
+    <div class="sidebar-widget">
+      <div class="status-badge">
+        <span class="status-dot"></span>
+        <span>Satellite screening available</span>
+      </div>
+      <div class="sidebar-caption">
+        <div id="vision-api-status">Checking optional image-analysis setup…</div>
+        The key stays server-side. With Gemini enabled, the selected image and proposal values are sent to Google for image review.
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="main-content" id="top">
+
+    <!-- Hero Banner -->
+    <header class="hero-banner">
+      <div>
+        <div class="pill-eyebrow">
+          <span>Site screening workspace · India</span>
+        </div>
+        <h1 class="hero-title">Review a site <br><span class="grad">before you build.</span></h1>
+        <p class="hero-desc">
+          Bring together satellite context and project dimensions to screen planning flags, review conditional BNS references, and identify practical next steps.
+        </p>
+        <div class="pill-tags">
+          <span class="pill-tag glow">Satellite imagery</span>
+          <span class="pill-tag glow">Project data review</span>
+          <span class="pill-tag">Map-based site selection</span>
+          <span class="pill-tag">BNS references with conditions</span>
+        </div>
+      </div>
+
+      <div class="hero-stat-card">
+        <div class="hero-stat-grid">
+          <div class="stat-box">
+            <div class="stat-val teal">Site</div>
+            <div class="stat-lbl">Satellite context</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-val purple">Optional</div>
+            <div class="stat-lbl">Gemini image analysis key</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-val blue">2</div>
+            <div class="stat-lbl">Project and imagery inputs</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-val">BNS</div>
+            <div class="stat-lbl">Conditional legal references</div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- SECTION: Pan-India Satellite Inspection -->
+    <section class="satellite-section" id="satellite-hub">
+      <div class="section-headline">
+        <h2>Site location and satellite context</h2>
+        <p>Add each plot address separately. Select an address match or click the map to preview that plot's satellite context.</p>
+      </div>
+
+      <!-- Search & Filters -->
+      <div class="search-filter-hub">
+        <div>
+          <div class="plot-address-list" id="plot-address-blocks">
+            <div class="plot-address-block" data-plot-block data-plot-id="1">
+              <div class="plot-address-heading">
+                <strong class="plot-address-title">Plot 1</strong>
+                <button class="remove-plot-address" type="button" hidden>Remove</button>
+              </div>
+              <div class="plot-address-fields">
+                <div class="field-group live-search-wrap">
+                  <label for="site-address">Address or plot location</label>
+                  <input id="site-address" class="plot-address-input" type="search" maxlength="500" placeholder="Enter an Indian address, landmark, or PIN code..." autocomplete="off">
+                  <input id="site-latitude" class="plot-latitude" type="hidden">
+                  <input id="site-longitude" class="plot-longitude" type="hidden">
+                  <div class="address-suggestions-box" id="address-suggestions-box"></div>
+                </div>
+                <div class="field-group">
+                  <label for="form-city">City Jurisdiction <span>89 cities</span></label>
+                  <select id="form-city" class="plot-city-select">
+                    <option>Ahmedabad</option>
+                    <option>Agartala</option>
+                    <option>Agra</option>
+                    <option>Ajmer</option>
+                    <option>Akola</option>
+                    <option>Aligarh</option>
+                    <option>Allahabad (Prayagraj)</option>
+                    <option>Amravati</option>
+                    <option>Amritsar</option>
+                    <option>Asansol</option>
+                    <option>Aurangabad (Chhatrapati Sambhajinagar)</option>
+                    <option>Bareilly</option>
+                    <option>Belagavi</option>
+                    <option>Bhavnagar</option>
+                    <option>Bhiwandi</option>
+                    <option>Bikaner</option>
+                    <option>Bokaro</option>
+                    <option>Bhopal</option>
+                    <option>Bengaluru</option>
+                    <option>Chandigarh</option>
+                    <option>Chennai</option>
+                    <option>Coimbatore</option>
+                    <option>Cuttack</option>
+                    <option>Dehradun</option>
+                    <option selected>Delhi</option>
+                    <option>Dhanbad</option>
+                    <option>Durg-Bhilai Nagar</option>
+                    <option>Erode</option>
+                    <option>Faridabad</option>
+                    <option>Firozabad</option>
+                    <option>Ghaziabad</option>
+                    <option>Gorakhpur</option>
+                    <option>Guntur</option>
+                    <option>Gwalior</option>
+                    <option>Hubballi-Dharwad</option>
+                    <option>Hyderabad</option>
+                    <option>Indore</option>
+                    <option>Jabalpur</option>
+                    <option>Jaipur</option>
+                    <option>Jalandhar</option>
+                    <option>Jammu</option>
+                    <option>Jamnagar</option>
+                    <option>Jamshedpur</option>
+                    <option>Jhansi</option>
+                    <option>Jodhpur</option>
+                    <option>Kanpur</option>
+                    <option>Kochi</option>
+                    <option>Kolhapur</option>
+                    <option>Kolkata</option>
+                    <option>Kota</option>
+                    <option>Kozhikode</option>
+                    <option>Lucknow</option>
+                    <option>Ludhiana</option>
+                    <option>Madurai</option>
+                    <option>Mangaluru</option>
+                    <option>Meerut</option>
+                    <option>Moradabad</option>
+                    <option>Mumbai</option>
+                    <option>Mysuru</option>
+                    <option>Nagpur</option>
+                    <option>Nashik</option>
+                    <option>Nellore</option>
+                    <option>Noida</option>
+                    <option>Patna</option>
+                    <option>Puducherry</option>
+                    <option>Pune</option>
+                    <option>Raipur</option>
+                    <option>Rajkot</option>
+                    <option>Ranchi</option>
+                    <option>Rourkela</option>
+                    <option>Salem</option>
+                    <option>Sangli-Miraj</option>
+                    <option>Shillong</option>
+                    <option>Shimla</option>
+                    <option>Siliguri</option>
+                    <option>Solapur</option>
+                    <option>Srinagar</option>
+                    <option>Surat</option>
+                    <option>Thiruvananthapuram</option>
+                    <option>Thrissur</option>
+                    <option>Tiruchirappalli</option>
+                    <option>Tiruppur</option>
+                    <option>Udaipur</option>
+                    <option>Ujjain</option>
+                    <option>Vadodara</option>
+                    <option>Varanasi</option>
+                    <option>Vijayawada</option>
+                    <option>Visakhapatnam</option>
+                    <option>Warangal</option>
+                  </select>
+                </div>
+                <div class="field-group">
+                  <label for="plot-reference-1">Block / plot reference</label>
+                  <input id="plot-reference-1" class="plot-address-reference" type="text" maxlength="80" placeholder="e.g. Block A - Plot 14">
+                </div>
+              </div>
+            </div>
+          </div>
+          <button class="add-plot-address" id="add-plot-address" type="button">+ Add another plot address</button>
+          <p class="plot-address-note">Each address gets its own assessment. Focus an address box before using the map to assign a map point to that plot. City-specific model training currently covers Bhopal, Indore, Pune, Mumbai, Delhi, Bengaluru, Hyderabad, Ahmedabad, Jaipur, and Nagpur.</p>
+        </div>
+
+        <!-- Regional Quick Presets -->
+        <div class="city-presets-row">
+          <span class="preset-label">Popular:</span>
+          <button class="city-chip" data-lat="28.6139" data-lon="77.2090" data-name="Delhi NCR">Delhi NCR</button>
+          <button class="city-chip" data-lat="18.9220" data-lon="72.8347" data-name="Mumbai">Mumbai</button>
+          <button class="city-chip" data-lat="12.9716" data-lon="77.5946" data-name="Bengaluru">Bengaluru</button>
+          <button class="city-chip" data-lat="17.3850" data-lon="78.4867" data-name="Hyderabad">Hyderabad</button>
+          <button class="city-chip" data-lat="18.5204" data-lon="73.8567" data-name="Pune">Pune</button>
+          <button class="city-chip" data-lat="13.0827" data-lon="80.2707" data-name="Chennai">Chennai</button>
+          <button class="city-chip" data-lat="23.0225" data-lon="72.5714" data-name="Ahmedabad">Ahmedabad</button>
+          <button class="city-chip" data-lat="22.5726" data-lon="88.3639" data-name="Kolkata">Kolkata</button>
+          <button class="city-chip" data-lat="26.9124" data-lon="75.7873" data-name="Jaipur">Jaipur</button>
+          <button class="city-chip" data-lat="23.2599" data-lon="77.4126" data-name="Bhopal">Bhopal</button>
+          <button class="city-chip" data-lat="22.7196" data-lon="75.8577" data-name="Indore">Indore</button>
+          <button class="city-chip" data-lat="21.1458" data-lon="79.0882" data-name="Nagpur">Nagpur</button>
+          <button class="city-chip" data-lat="9.9312"  data-lon="76.2673" data-name="Kochi">Kochi</button>
+          <button class="btn-locate" id="btn-gps-locate" type="button" title="Locate via browser GPS">📍 Locate Me</button>
+        </div>
+
+        <!-- Coordinates Direct Input -->
+        <div class="coord-bar">
+          <div class="coord-field">
+            <label>Lat:</label>
+            <input id="coord-lat" type="number" step="any" placeholder="28.6139">
+          </div>
+          <div class="coord-field">
+            <label>Lon:</label>
+            <input id="coord-lon" type="number" step="any" placeholder="77.2090">
+          </div>
+          <button class="btn-coord-go" id="btn-coord-go" type="button">Go &#8594;</button>
+          <div class="coord-hint">💡 <span>Tip: Click or tap anywhere directly on the map to drop a pin and inspect</span></div>
+        </div>
+      </div>
+
+      <!-- Map & Inspector Grid -->
+      <div class="map-workbench-grid">
+
+        <!-- Leaflet Map Container -->
+        <div class="map-frame">
+          <div id="inspection-map" role="region" aria-label="Interactive Satellite Map of India"></div>
+
+          <!-- Layer Switcher -->
+          <div class="map-layer-selector">
+            <button class="layer-btn active" id="layer-sat" type="button" title="Esri True Color Satellite">🛰️ Satellite</button>
+            <button class="layer-btn" id="layer-hybrid" type="button" title="Satellite with Road & Place Labels">🗺️ Hybrid</button>
+            <button class="layer-btn" id="layer-street" type="button" title="OpenStreetMap Streets">🏙️ Streets</button>
+            <button class="layer-btn" id="layer-topo" type="button" title="Topography & Contours">⛰️ Terrain</button>
+          </div>
+
+          <!-- Measurement Toolbar -->
+          <div class="map-tools-selector">
+            <button class="tool-btn" id="tool-measure-area" type="button" title="Click points on the satellite view to measure plot area">📐 Measure Plot Area</button>
+            <button class="tool-btn" id="tool-measure-dist" type="button" title="Click two points across a road to measure width">📏 Measure Road Width</button>
+            <button class="tool-btn" id="tool-clear-measures" type="button" title="Clear all drawn measurements">✕ Clear</button>
+          </div>
+
+          <!-- Measurement Results Floating Card -->
+          <div class="measure-badge-card" id="measure-card">
+            <div class="measure-title">
+              <span id="measure-title-text">Plot Area</span>
+              <span style="cursor:pointer;" id="measure-close-btn">&times;</span>
+            </div>
+            <div class="measure-val" id="measure-main-val">0 sq m</div>
+            <div class="measure-sub" id="measure-sub-val">0 sq ft &middot; 0m perimeter</div>
+            <button class="btn-apply-measure" id="btn-apply-measure-val" type="button">Apply to Proposal Form &#8594;</button>
+          </div>
+
+          <!-- Floating Status HUD -->
+          <div class="map-status-hud">
+            <div class="hud-indicator">
+              <span>Center:</span>
+              <span class="hud-val" id="hud-coords">20.5937°N, 78.9629°E</span>
+            </div>
+            <div class="hud-indicator">
+              <span>Buildings Mapped:</span>
+              <span class="hud-val" id="hud-bldg-count">0</span>
+            </div>
+          </div>
+
+          <!-- Radius Selector -->
+          <div class="map-radius-selector" title="Building Footprint Extraction Radius">
+            <button class="radius-btn" data-radius="100">100m</button>
+            <button class="radius-btn" data-radius="250">250m</button>
+            <button class="radius-btn active" data-radius="500">500m</button>
+            <button class="radius-btn" data-radius="1000">1000m</button>
+          </div>
+        </div>
+
+        <!-- Inspector Side Panel -->
+        <aside class="inspector-panel">
+          <div class="inspector-card-header">
+            <h3>📍 Inspected Location</h3>
+            <span class="status-badge" style="width:auto;margin:0;padding:3px 8px;font-size:10.5px;" id="loc-source-badge">Nominatim GPS</span>
+          </div>
+
+          <div class="selected-site-box">
+            <div class="site-addr-title" id="site-display-title">Delhi NCR · preview location</div>
+            <div class="site-addr-detail" id="site-display-detail">Choose a site on the map or search for an address. The selected location will be included with the project assessment.</div>
+            <div class="site-tag-row" id="site-tags-wrap">
+              <span class="site-tag" id="tag-city">Pan-India</span>
+              <span class="site-tag" id="tag-coords">Lat/Lon Ready</span>
+            </div>
+            <button class="btn-apply-form" id="btn-copy-to-form" type="button">
+              <span>📋 Use Location for Active Plot</span>
+            </button>
+          </div>
+
+          <div class="inspector-card-header">
+            <h3>🏢 Selected Building Footprint</h3>
+          </div>
+          <div class="building-info-box" id="building-info-content">
+            <p style="color:var(--text-muted);font-size:12px;">Click any teal building polygon on the satellite map to view structural tags and attributes.</p>
+          </div>
+
+          <div class="inspector-card-header">
+            <h3>⭐ Tracked Sites</h3>
+          </div>
+          <div class="tracked-sites-list" id="tracked-sites-box">
+            <span style="color:var(--text-muted);font-size:11.5px;">No saved locations yet.</span>
+          </div>
+        </aside>
+      </div>
+
+      <!-- AI Satellite Vision & Spatial Intelligence Analysis Panel -->
+      <div class="ai-intel-panel" id="ai-panel">
+        <div class="ai-header-row">
+          <div class="ai-title-wrap">
+            <div class="ai-spark-icon">✨</div>
+            <div>
+              <h3>Satellite image observations</h3>
+              <p>With Gemini enabled, imagery is reviewed alongside project values. Without it, the report uses mapped site context and shows the proposal values for review.</p>
+            </div>
+          </div>
+          <button class="btn-run-ai" id="btn-run-satellite-ai" type="button">
+            <span>Generate site context report</span>
+          </button>
+        </div>
+
+        <div class="ai-content-grid">
+          <!-- 1024x1024 Satellite Image Preview -->
+          <div class="satellite-preview-card">
+            <img class="satellite-snapshot-img" id="satellite-img-view" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='280' height='240' fill='%23080e14'%3E%3Crect width='100%25' height='100%25'/%3E%3Ctext x='50%25' y='50%25' fill='%2338bdf8' font-family='sans-serif' font-size='12' text-anchor='middle'%3ESatellite Snapshot Ready%3C/text%3E%3C/svg%3E" alt="Satellite Capture">
+            <div class="snapshot-meta">
+            <span>Source: Esri World Imagery · capture date may vary</span>
+              <span id="snapshot-status-tag">Ready</span>
+            </div>
+          </div>
+
+          <!-- Report text -->
+          <div>
+            <div class="ai-report-body" id="ai-analysis-text">
+              Select a site and run the combined assessment to review image observations together with the project dimensions.
+            </div>
+            <div class="ai-disclaimer-box">
+              Satellite imagery can be dated or incomplete. It cannot confirm boundaries, underground services, or statutory compliance.
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION: Proposal Feasibility Assessment Form -->
+    <section id="proposal-form-section">
+      <div class="section-headline">
+        <h2>Project details and combined review</h2>
+        <p>Add one or more plot locations, enter the proposed building dimensions once, and get a separate map, satellite, and planning review for each plot.</p>
+      </div>
+
+      <form id="proposal-form" novalidate>
+        <div class="form-panel-grid">
+
+          <!-- Section 01 -->
+          <div class="panel-box">
+            <div class="panel-box-header">
+              <div class="panel-num-icon teal">01</div>
+              <div>
+                <h3>Project Profile</h3>
+                <p>Shared planning inputs applied to each selected plot.</p>
+              </div>
+            </div>
+
+            <div class="form-fields-grid">
+              <div class="field-group">
+                <label for="form-zone">Zone Classification</label>
+                <select id="form-zone" name="zone_type">
+                  <option>Residential</option>
+                  <option>Commercial</option>
+                  <option>Mixed-Use</option>
+                  <option>Industrial</option>
+                  <option>Institutional</option>
+                </select>
+              </div>
+
+              <div class="field-group">
+                <label for="form-plot-size">
+                  <span>Plot Size (sq m)</span>
+                  <span class="import-btn" id="import-plot-hint" title="Import from map polygon">← Import Measured</span>
+                </label>
+                <input id="form-plot-size" name="plot_size_sqm" type="number" min="20" value="500" step="10" required>
+              </div>
+
+              <div class="field-group">
+                <label for="form-road-width">
+                  <span>Road Width (m)</span>
+                  <span class="import-btn" id="import-road-hint" title="Import from map ruler">← Import Measured</span>
+                </label>
+                <input id="form-road-width" name="road_width_m" type="number" min="1" value="12" step="0.5" required>
+              </div>
+            </div>
+          </div>
+
+          <!-- Section 02 -->
+          <div class="panel-box">
+            <div class="panel-box-header">
+              <div class="panel-num-icon blue">02</div>
+              <div>
+                <h3>Building Proposal &amp; Geometry</h3>
+                <p>Architectural concept values for FAR and setback review.</p>
+              </div>
+            </div>
+
+            <div class="form-fields-grid">
+              <div class="field-group">
+                <label for="form-far">Proposed FAR</label>
+                <input id="form-far" name="far_proposed" type="number" min="0.1" value="1.5" step="0.1" required>
+              </div>
+
+              <div class="field-group">
+                <label for="form-height">Proposed Height (m)</label>
+                <input id="form-height" name="height_proposed_m" type="number" min="1" value="18" step="0.5" required>
+              </div>
+
+              <div class="field-group">
+                <label for="form-floors">Floors Count</label>
+                <input id="form-floors" name="floors" type="number" min="1" value="5" step="1" required>
+              </div>
+
+              <div class="field-group">
+                <label for="form-coverage">Ground Coverage (%)</label>
+                <input id="form-coverage" name="ground_coverage_pct" type="number" min="1" max="100" value="45" step="1" required>
+              </div>
+
+              <div class="field-group">
+                <label for="form-front-setback">Front Setback (m)</label>
+                <input id="form-front-setback" name="setback_front_m" type="number" min="0" value="6" step="0.5" required>
+              </div>
+
+              <div class="field-group">
+                <label for="form-rear-setback">Rear Setback (m)</label>
+                <input id="form-rear-setback" name="setback_rear_m" type="number" min="0" value="4.5" step="0.5" required>
+              </div>
+
+              <div class="field-group">
+                <label for="form-side-setback">Side Setback (m)</label>
+                <input id="form-side-setback" name="setback_side_m" type="number" min="0" value="3" step="0.5" required>
+              </div>
+
+              <div class="field-group">
+                <label for="form-parking">Parking Provided (ECS)</label>
+                <input id="form-parking" name="parking_provided_ecs" type="number" min="0" value="25" step="1" required>
+              </div>
+            </div>
+          </div>
+
+          <!-- Section 03 -->
+          <div class="panel-box form-panel-full">
+            <div class="panel-box-header">
+              <div class="panel-num-icon purple">03</div>
+              <div>
+                <h3>Subsurface &amp; Underground Utility Signals</h3>
+                <p>Features that inform sub-grade conflict probability and pipeline risks.</p>
+              </div>
+            </div>
+
+            <div class="form-fields-grid" style="grid-template-columns: repeat(3, 1fr);">
+              <div class="field-group" style="justify-content: center;">
+                <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13.5px;color:var(--text-primary);padding-top:16px;">
+                  <input id="form-basement" name="basement_proposed" type="checkbox" style="width:18px;height:18px;accent-color:var(--accent);">
+                  <span>Basement Construction Proposed</span>
+                </label>
+              </div>
+
+              <div class="field-group">
+                <label for="form-foundation-depth">Foundation Depth (m)</label>
+                <input id="form-foundation-depth" name="foundation_depth_m" type="number" min="0.1" value="2.0" step="0.1" required>
+              </div>
+
+              <div class="field-group">
+                <label for="form-gis-confidence">GIS Record Confidence (0 to 1)</label>
+                <input id="form-gis-confidence" name="gis_record_confidence" type="number" min="0" max="1" value="0.80" step="0.05" required>
+              </div>
+            </div>
+
+            <div class="submit-cta-row">
+              <button class="btn-submit-assessment" id="btn-submit-form" type="submit">
+                <span>Run Combined Site Assessment</span>
+                <span>&#8594;</span>
+              </button>
+              <div class="submit-note-text">
+                Screening flags need confirmation against current local rules, an accurate survey, and site-specific evidence.
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </form>
+
+      <!-- Feasibility Results Container -->
+      <div class="results-wrap" id="results" aria-live="polite"></div>
+    </section>
+
+    <section class="violations-page" id="violations-actions" aria-labelledby="violations-actions-title">
+      <div class="section-headline">
+        <h2 id="violations-actions-title">Potential Violations &amp; Possible Actions</h2>
+        <p>Review possible screening flags and recommended next steps for each assessed plot.</p>
+      </div>
+      <p class="result-disclaimer">These are automated screening flags, not confirmed violations or legal findings. Verify applicable rules, approvals, and site conditions with qualified professionals and the relevant authority.</p>
+      <div class="violations-page-summary" id="violations-actions-summary" aria-live="polite">Run a site assessment to see plot-specific flags and recommended actions.</div>
+      <div id="violations-actions-content"></div>
+      <section class="precedent-reference" aria-labelledby="precedent-reference-title">
+        <h3 id="precedent-reference-title">Selected Supreme Court precedents</h3>
+        <p class="precedent-reference-intro">Short urban-planning enforcement references for policy and legislative review. These judgments are not interpretations of the BNS.</p>
+        <ol class="precedent-list">
+          <li>
+            <a href="https://indiankanoon.org/doc/1902389/" target="_blank" rel="noopener noreferrer">Friends Colony Development Committee v. State of Orissa, (2004) 8 SCC 733</a>
+            <p>Emphasized planned development and public safety; deliberate, non-compoundable deviations by professional builders should not be routinely regularized, and accountability of responsible officials may also require attention. The matter was remitted for fact-specific determination.</p>
+          </li>
+          <li>
+            <a href="https://indiankanoon.org/doc/2164790/" target="_blank" rel="noopener noreferrer">Esha Ekta Apartments Co-operative Housing Society Ltd. v. Municipal Corporation of Mumbai, (2013) 5 SCC 357</a>
+            <p>Rejected regularization of the disputed unauthorized floors on those facts, allowed the municipal notices to be implemented, and left purchasers free to pursue appropriate remedies against the builders.</p>
+          </li>
+          <li>
+            <a href="https://indiankanoon.org/doc/183938903/" target="_blank" rel="noopener noreferrer">Dipak Kumar Mukherjee v. Kolkata Municipal Corporation, (2013) 5 SCC 336</a>
+            <p>For admitted construction beyond the sanctioned plan despite stop-work notices, directed demolition, buyer refunds with interest, and costs. The order turned on the evidence and statutory framework in that case.</p>
+          </li>
+          <li>
+            <a href="https://indiankanoon.org/doc/199986312/" target="_blank" rel="noopener noreferrer">Supertech Ltd. v. Emerald Court Owner Resident Welfare Association, (2021) 10 SCC 1</a>
+            <p>Upheld demolition of two towers after finding specific building-regulation and apartment-law violations; directed the developer to bear demolition costs and refund affected purchasers. It is a fact-specific judgment, not an automatic remedy for every planning flag.</p>
+          </li>
+        </ol>
+        <p class="precedent-reference-note">Check the full judgments, later decisions, and current state and municipal statutes before relying on a precedent in drafting or enforcement.</p>
+      </section>
+    </section>
+
+  </main>
+</div>
+
+<!-- Floating Toast -->
+<div class="toast-msg" id="toast">Location copied to proposal form!</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script>
+  /* ── State & Variables ──────────────────────────────────────────────── */
+  let inspMap, siteMarker, buildingLayer;
+  let layerSat, layerHybrid, layerStreet, layerTopo;
+  let activeMeasureMode = null; // 'area' | 'dist' | null
+  let measurePoints = [];
+  let measurePolyline = null;
+  let measurePolygon = null;
+  let measureMarkers = [];
+  let lastMeasuredAreaSqm = null;
+  let lastMeasuredWidthM = null;
+  let currentLoc = { lat: 28.6139, lon: 77.2090, label: "Delhi NCR", city: "Delhi" };
+  let currentBuildingRadius = 500;
+  const TRACKED_STORAGE_KEY = 'civiclens_panindia_tracked_v2';
+
+  /* ── Helper utilities ──────────────────────────────────────────────── */
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('visible');
+    setTimeout(() => { t.classList.remove('visible'); }, 3000);
+  }
+
+  function escapeHtml(s) {
+    return String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;' }[c]));
+  }
+
+  async function updateVisionApiStatus() {
+    const status = document.getElementById('vision-api-status');
+    try {
+      const res = await fetch('/api/gemini-status');
+      const data = await res.json();
+      status.textContent = data.configured
+        ? `Image analysis connected · ${data.model || 'Gemini'}`
+        : 'Optional Gemini key not set · built-in site screening remains available';
+    } catch (_) {
+      status.textContent = 'API status unavailable · check that the CivicLens server is running';
+    }
+  }
+
+  /* ── Map Initialization ────────────────────────────────────────────── */
+  function initMap() {
+    inspMap = L.map('inspection-map', {
+      zoomControl: true,
+      center: [currentLoc.lat, currentLoc.lon],
+      zoom: 16
+    });
+
+    // Basemap Layers
+    layerSat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+      maxZoom: 19,
+      attribution: 'Esri World Imagery'
+    }).addTo(inspMap);
+
+    layerHybrid = L.layerGroup([
+      L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19 }),
+      L.tileLayer('https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, opacity: 0.9 })
+    ]);
+
+    layerStreet = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '© OpenStreetMap contributors'
+    });
+
+    layerTopo = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+      maxZoom: 17,
+      attribution: '© OpenTopoMap contributors'
+    });
+
+    // Layer Switcher Buttons
+    const layerButtons = {
+      'layer-sat': layerSat,
+      'layer-hybrid': layerHybrid,
+      'layer-street': layerStreet,
+      'layer-topo': layerTopo
+    };
+
+    Object.keys(layerButtons).forEach(btnId => {
+      document.getElementById(btnId).addEventListener('click', function() {
+        Object.keys(layerButtons).forEach(id => {
+          document.getElementById(id).classList.remove('active');
+          if (inspMap.hasLayer(layerButtons[id])) inspMap.removeLayer(layerButtons[id]);
+        });
+        this.classList.add('active');
+        layerButtons[btnId].addTo(inspMap);
+        if (buildingLayer) buildingLayer.bringToFront();
+        if (siteMarker) siteMarker.bringToFront();
+      });
+    });
+
+    // Map Click Listener -> Inspect Anywhere in India!
+    inspMap.on('click', function(e) {
+      if (activeMeasureMode) {
+        handleMeasureClick(e.latlng);
+        return;
+      }
+      inspectCoordinates(e.latlng.lat, e.latlng.lng, true);
+    });
+
+    // Map Movement Listener -> Update HUD Coordinates
+    inspMap.on('move', function() {
+      const center = inspMap.getCenter();
+      document.getElementById('hud-coords').textContent = `${center.lat.toFixed(4)}°N, ${center.lng.toFixed(4)}°E`;
+    });
+
+    // Initial Marker
+    placeMarker(currentLoc.lat, currentLoc.lon, "Target Site");
+    loadSurroundingBuildings(currentLoc.lat, currentLoc.lon, currentBuildingRadius);
+  }
+
+  /* ── Marker & Inspection Logic ─────────────────────────────────────── */
+  function placeMarker(lat, lon, label) {
+    if (siteMarker) inspMap.removeLayer(siteMarker);
+
+    // Custom glowing neon pin
+    const customIcon = L.divIcon({
+      className: 'custom-map-pin',
+      html: `<div style="
+        width: 18px; height: 18px; background: #00f0ff; border: 3px solid #fff;
+        border-radius: 50%; box-shadow: 0 0 16px #00f0ff, 0 0 32px rgba(0,240,255,0.6);
+        cursor: pointer; transform: translate(-9px, -9px);
+      "></div>`,
+      iconSize: [18, 18],
+      iconAnchor: [9, 9]
+    });
+
+    siteMarker = L.marker([lat, lon], { icon: customIcon, draggable: true }).addTo(inspMap);
+    siteMarker.bindPopup(`<strong>${escapeHtml(label)}</strong><br><span style="font-size:11px;color:#94a3b8;">${lat.toFixed(5)}, ${lon.toFixed(5)}</span>`).openPopup();
+
+    siteMarker.on('dragend', function(e) {
+      const pos = e.target.getLatLng();
+      inspectCoordinates(pos.lat, pos.lng, true);
+    });
+  }
+
+  async function inspectCoordinates(lat, lon, fetchReverse = true) {
+    currentLoc.lat = lat;
+    currentLoc.lon = lon;
+    const targetBlock = getActivePlotBlock();
+    document.getElementById('coord-lat').value = lat.toFixed(5);
+    document.getElementById('coord-lon').value = lon.toFixed(5);
+    if (targetBlock) {
+      targetBlock.querySelector('.plot-latitude').value = lat;
+      targetBlock.querySelector('.plot-longitude').value = lon;
+    }
+    if (fetchReverse) {
+      currentLoc.label = `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
+      if (targetBlock) targetBlock.querySelector('.plot-address-input').value = currentLoc.label;
+    }
+
+    placeMarker(lat, lon, "Inspecting...");
+
+    // Update snapshot preview URL
+    const previewUrl = `/api/satellite-preview?lat=${lat}&lon=${lon}`;
+    const snapImg = document.getElementById('satellite-img-view');
+    snapImg.src = previewUrl;
+    document.getElementById('snapshot-status-tag').textContent = `${lat.toFixed(3)}, ${lon.toFixed(3)}`;
+
+    // Reset AI text hint
+    document.getElementById('ai-analysis-text').innerHTML = `Location targeted: <strong>${lat.toFixed(5)}°N, ${lon.toFixed(5)}°E</strong>. Run the combined assessment with project data, or preview image observations here.`;
+
+    if (fetchReverse) {
+      document.getElementById('site-display-title').textContent = "Resolving Indian address...";
+      document.getElementById('site-display-detail').textContent = `Querying coordinates ${lat.toFixed(5)}, ${lon.toFixed(5)} via Nominatim...`;
+      try {
+        const res = await fetch(`/api/reverse-geocode?lat=${lat}&lon=${lon}`);
+        const data = await res.json();
+        if (res.ok && data.label) {
+          currentLoc.label = data.label;
+          currentLoc.city = data.city || data.state || "Indian Site";
+          if (targetBlock) {
+            targetBlock.querySelector('.plot-address-input').value = data.label;
+            applyJurisdictionMatch(targetBlock, data);
+          }
+          document.getElementById('site-display-title').textContent = data.city ? `${data.city} (${data.suburb || data.road || 'Site'})` : data.label.split(',')[0];
+          document.getElementById('site-display-detail').textContent = data.label;
+          document.getElementById('tag-city').textContent = data.city || data.state || "India";
+          document.getElementById('tag-coords').textContent = `${lat.toFixed(4)}°N, ${lon.toFixed(4)}°E`;
+          siteMarker.setPopupContent(`<strong>${escapeHtml(data.label.split(',')[0])}</strong><br><span style="font-size:11px;color:#94a3b8;">${lat.toFixed(5)}, ${lon.toFixed(5)}</span>`);
+        }
+      } catch (err) {
+        currentLoc.label = `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
+        document.getElementById('site-display-title').textContent = `Site at ${lat.toFixed(5)}, ${lon.toFixed(5)}`;
+        document.getElementById('site-display-detail').textContent = "Coordinates active across India.";
+        if (targetBlock) targetBlock.querySelector('.plot-address-input').value = currentLoc.label;
+      }
+    }
+
+    loadSurroundingBuildings(lat, lon, currentBuildingRadius);
+  }
+
+  /* ── OpenStreetMap Overpass Buildings Layer ───────────────────────── */
+  async function loadSurroundingBuildings(lat, lon, radius) {
+    if (buildingLayer) inspMap.removeLayer(buildingLayer);
+    document.getElementById('hud-bldg-count').textContent = "Loading...";
+
+    try {
+      const res = await fetch(`/api/buildings?lat=${lat}&lon=${lon}&radius=${radius}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to load building data.");
+
+      const features = data.features || [];
+      document.getElementById('hud-bldg-count').textContent = features.length;
+
+      buildingLayer = L.geoJSON(data, {
+        style: function() {
+          return {
+            color: '#00f0ff',
+            weight: 2,
+            opacity: 0.85,
+            fillColor: '#00f0ff',
+            fillOpacity: 0.22
+          };
+        },
+        onEachFeature: function(feature, layer) {
+          layer.on({
+            mouseover: function(e) {
+              e.target.setStyle({ weight: 3, fillOpacity: 0.45, color: '#38bdf8' });
+            },
+            mouseout: function(e) {
+              buildingLayer.resetStyle(e.target);
+            },
+            click: function(e) {
+              L.DomEvent.stopPropagation(e);
+              displayBuildingDetails(feature);
+            }
+          });
+        }
+      }).addTo(inspMap);
+
+      if (features.length > 0 && !activeMeasureMode) {
+        // Subtle fit bounds if far off
+        const bounds = buildingLayer.getBounds();
+        if (bounds.isValid() && !inspMap.getBounds().contains(bounds)) {
+          inspMap.fitBounds(bounds.pad(0.1), { maxZoom: 18 });
+        }
+      }
+    } catch (err) {
+      document.getElementById('hud-bldg-count').textContent = "0";
+    }
+  }
+
+  function displayBuildingDetails(feature) {
+    const props = feature.properties || {};
+    const bType = props.building || 'Structure';
+    const levels = props['building:levels'] || 'Not catalogued';
+    const street = props['addr:street'] || props['addr:suburb'] || 'Local municipal road';
+    const osmId = props.osm_id || feature.id;
+
+    document.getElementById('building-info-content').innerHTML = `
+      <div class="info-row"><span class="info-lbl">Typology:</span><span class="info-val">${escapeHtml(bType)}</span></div>
+      <div class="info-row"><span class="info-lbl">Storeys / Levels:</span><span class="info-val">${escapeHtml(levels)}</span></div>
+      <div class="info-row"><span class="info-lbl">Road / Street:</span><span class="info-val">${escapeHtml(street)}</span></div>
+      <div class="info-row"><span class="info-lbl">Cadastral Ref:</span><span class="info-val">OSM #${escapeHtml(osmId)}</span></div>
+      <button class="btn-apply-form" style="margin-top:10px;padding:6px 10px;font-size:11px;" onclick="trackCurrentSite('${escapeHtml(bType)}')">⭐ Save & Track Building</button>
+    `;
+    showToast("Building outline inspected!");
+  }
+
+  function trackCurrentSite(customName) {
+    const name = customName || currentLoc.label.split(',')[0] || "Saved Site";
+    let tracked = [];
+    try { tracked = JSON.parse(localStorage.getItem(TRACKED_STORAGE_KEY) || '[]'); } catch (_) {}
+    tracked = tracked.filter(t => Math.abs(t.lat - currentLoc.lat) > 0.0001 || Math.abs(t.lon - currentLoc.lon) > 0.0001);
+    tracked.unshift({ name: name, lat: currentLoc.lat, lon: currentLoc.lon });
+    localStorage.setItem(TRACKED_STORAGE_KEY, JSON.stringify(tracked.slice(0, 15)));
+    renderTrackedSites();
+    showToast(`Tracked: ${name}`);
+  }
+
+  function renderTrackedSites() {
+    const box = document.getElementById('tracked-sites-box');
+    let tracked = [];
+    try { tracked = JSON.parse(localStorage.getItem(TRACKED_STORAGE_KEY) || '[]'); } catch (_) {}
+    if (!tracked.length) {
+      box.innerHTML = `<span style="color:var(--text-muted);font-size:11.5px;">No saved locations yet.</span>`;
+      return;
+    }
+    box.innerHTML = tracked.map((t, idx) => `
+      <div class="tracked-chip" data-idx="${idx}">
+        <span class="tracked-name">${escapeHtml(t.name)}</span>
+        <span class="tracked-coords">${t.lat.toFixed(4)}, ${t.lon.toFixed(4)}</span>
+      </div>
+    `).join('');
+
+    box.querySelectorAll('.tracked-chip').forEach(el => {
+      el.addEventListener('click', function() {
+        const item = tracked[Number(this.dataset.idx)];
+        inspMap.setView([item.lat, item.lon], 17);
+        inspectCoordinates(item.lat, item.lon, true);
+      });
+    });
+  }
+
+  /* ── Measurement Tools (Plot Area & Road Width) ───────────────────── */
+  const btnMeasureArea = document.getElementById('tool-measure-area');
+  const btnMeasureDist = document.getElementById('tool-measure-dist');
+  const btnClearMeasures = document.getElementById('tool-clear-measures');
+  const measureCard = document.getElementById('measure-card');
+
+  btnMeasureArea.addEventListener('click', function() {
+    clearMeasurements();
+    activeMeasureMode = 'area';
+    this.classList.add('active');
+    btnMeasureDist.classList.remove('active');
+    document.getElementById('measure-title-text').textContent = "📐 Plot Area Boundary";
+    document.getElementById('measure-main-val').textContent = "Click 3+ points on map";
+    document.getElementById('measure-sub-val').textContent = "Outline your proposed plot parcel";
+    measureCard.classList.add('visible');
+    showToast("Plot Area Mode: Click on satellite view to add parcel corners.");
+  });
+
+  btnMeasureDist.addEventListener('click', function() {
+    clearMeasurements();
+    activeMeasureMode = 'dist';
+    this.classList.add('active');
+    btnMeasureArea.classList.remove('active');
+    document.getElementById('measure-title-text').textContent = "📏 Road Width / Distance";
+    document.getElementById('measure-main-val').textContent = "Click point 1 & 2";
+    document.getElementById('measure-sub-val').textContent = "Measure abutting road right-of-way";
+    measureCard.classList.add('visible');
+    showToast("Road Width Mode: Click across road edges to measure width.");
+  });
+
+  btnClearMeasures.addEventListener('click', clearMeasurements);
+  document.getElementById('measure-close-btn').addEventListener('click', clearMeasurements);
+
+  function clearMeasurements() {
+    activeMeasureMode = null;
+    measurePoints = [];
+    lastMeasuredAreaSqm = null;
+    lastMeasuredWidthM = null;
+    btnMeasureArea.classList.remove('active');
+    btnMeasureDist.classList.remove('active');
+    measureCard.classList.remove('visible');
+    if (measurePolyline) { inspMap.removeLayer(measurePolyline); measurePolyline = null; }
+    if (measurePolygon) { inspMap.removeLayer(measurePolygon); measurePolygon = null; }
+    measureMarkers.forEach(m => inspMap.removeLayer(m));
+    measureMarkers = [];
+  }
+
+  function handleMeasureClick(latlng) {
+    measurePoints.push(latlng);
+
+    // Marker at vertex
+    const vertexMarker = L.circleMarker(latlng, {
+      radius: 5, color: '#a855f7', fillColor: '#fff', fillOpacity: 1, weight: 2
+    }).addTo(inspMap);
+    measureMarkers.push(vertexMarker);
+
+    if (activeMeasureMode === 'area') {
+      if (measurePoints.length >= 2) {
+        if (measurePolygon) inspMap.removeLayer(measurePolygon);
+        measurePolygon = L.polygon(measurePoints, {
+          color: '#a855f7', fillColor: '#a855f7', fillOpacity: 0.25, weight: 2
+        }).addTo(inspMap);
+
+        const areaSqm = calculatePolygonArea(measurePoints);
+        lastMeasuredAreaSqm = Math.round(areaSqm);
+        const areaSqft = Math.round(areaSqm * 10.7639);
+        const perimM = Math.round(calculatePerimeter(measurePoints));
+
+        document.getElementById('measure-main-val').textContent = `${lastMeasuredAreaSqm.toLocaleString()} sq m`;
+        document.getElementById('measure-sub-val').textContent = `${areaSqft.toLocaleString()} sq ft · ${perimM}m perimeter`;
+      }
+    } else if (activeMeasureMode === 'dist') {
+      if (measurePoints.length >= 2) {
+        if (measurePolyline) inspMap.removeLayer(measurePolyline);
+        measurePolyline = L.polyline(measurePoints, { color: '#38bdf8', weight: 3, dashArray: '5, 8' }).addTo(inspMap);
+        const p1 = measurePoints[measurePoints.length - 2];
+        const p2 = measurePoints[measurePoints.length - 1];
+        const distM = p1.distanceTo(p2);
+        lastMeasuredWidthM = Math.round(distM * 10) / 10;
+        document.getElementById('measure-main-val').textContent = `${lastMeasuredWidthM} m`;
+        document.getElementById('measure-sub-val').textContent = `${Math.round(lastMeasuredWidthM * 3.28084 * 10) / 10} ft road width`;
+      }
+    }
+  }
+
+  function calculatePolygonArea(coords) {
+    if (coords.length < 3) return 0;
+    const lat0 = coords[0].lat;
+    const lon0 = coords[0].lng;
+    const R = 6378137;
+    const rad = Math.PI / 180;
+    const cosLat0 = Math.cos(lat0 * rad);
+
+    const projected = coords.map(c => [
+      (c.lng - lon0) * rad * R * cosLat0,
+      (c.lat - lat0) * rad * R
+    ]);
+
+    let area = 0;
+    for (let i = 0; i < projected.length; i++) {
+      const j = (i + 1) % projected.length;
+      area += projected[i][0] * projected[j][1];
+      area -= projected[j][0] * projected[i][1];
+    }
+    return Math.abs(area) / 2;
+  }
+
+  function calculatePerimeter(coords) {
+    let perim = 0;
+    for (let i = 0; i < coords.length; i++) {
+      const j = (i + 1) % coords.length;
+      perim += coords[i].distanceTo(coords[j]);
+    }
+    return perim;
+  }
+
+  document.getElementById('btn-apply-measure-val').addEventListener('click', function() {
+    if (lastMeasuredAreaSqm) {
+      document.getElementById('form-plot-size').value = lastMeasuredAreaSqm;
+      showToast(`Plot size set to ${lastMeasuredAreaSqm} sq m!`);
+    } else if (lastMeasuredWidthM) {
+      document.getElementById('form-road-width').value = lastMeasuredWidthM;
+      showToast(`Road width set to ${lastMeasuredWidthM} m!`);
+    }
+  });
+
+  document.getElementById('import-plot-hint').addEventListener('click', function() {
+    if (lastMeasuredAreaSqm) {
+      document.getElementById('form-plot-size').value = lastMeasuredAreaSqm;
+      showToast(`Imported ${lastMeasuredAreaSqm} sq m from map!`);
+    } else {
+      showToast("Use 'Measure Plot Area' on map first.");
+      btnMeasureArea.click();
+    }
+  });
+
+  document.getElementById('import-road-hint').addEventListener('click', function() {
+    if (lastMeasuredWidthM) {
+      document.getElementById('form-road-width').value = lastMeasuredWidthM;
+      showToast(`Imported ${lastMeasuredWidthM} m road width from map!`);
+    } else {
+      showToast("Use 'Measure Road Width' on map first.");
+      btnMeasureDist.click();
+    }
+  });
+
+  /* ── Copy Location to Form Button ──────────────────────────────────── */
+  document.getElementById('btn-copy-to-form').addEventListener('click', function() {
+    const targetBlock = getActivePlotBlock();
+    if (!targetBlock) return;
+    targetBlock.querySelector('.plot-address-input').value = currentLoc.label;
+    targetBlock.querySelector('.plot-latitude').value = currentLoc.lat;
+    targetBlock.querySelector('.plot-longitude').value = currentLoc.lon;
+    applyJurisdictionMatch(targetBlock, { city: currentLoc.city });
+    showToast(`Map location applied to ${targetBlock.querySelector('.plot-address-title').textContent}.`);
+  });
+
+  /* ── City Quick Jump Chips ─────────────────────────────────────────── */
+  document.querySelectorAll('.city-chip').forEach(chip => {
+    chip.addEventListener('click', function() {
+      const lat = parseFloat(this.dataset.lat);
+      const lon = parseFloat(this.dataset.lon);
+      const name = this.dataset.name;
+      inspMap.setView([lat, lon], 16);
+      inspectCoordinates(lat, lon, true);
+      showToast(`Jumped to ${name}`);
+    });
+  });
+
+  /* ── Direct Coordinates Go Button ──────────────────────────────────── */
+  document.getElementById('btn-coord-go').addEventListener('click', function() {
+    const lat = parseFloat(document.getElementById('coord-lat').value);
+    const lon = parseFloat(document.getElementById('coord-lon').value);
+    if (!isNaN(lat) && !isNaN(lon) && lat >= 6 && lat <= 38 && lon >= 68 && lon <= 98) {
+      inspMap.setView([lat, lon], 16);
+      inspectCoordinates(lat, lon, true);
+    } else {
+      showToast("Enter valid coordinates within India (Lat 6°-38°N, Lon 68°-98°E).");
+    }
+  });
+
+  /* ── GPS Locate Me Button ──────────────────────────────────────────── */
+  document.getElementById('btn-gps-locate').addEventListener('click', function() {
+    if (!navigator.geolocation) {
+      showToast("Geolocation is not supported by your browser.");
+      return;
+    }
+    showToast("Requesting GPS coordinates...");
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        const lat = pos.coords.latitude;
+        const lon = pos.coords.longitude;
+        inspMap.setView([lat, lon], 17);
+        inspectCoordinates(lat, lon, true);
+        showToast("Centered on your current location!");
+      },
+      err => {
+        showToast("GPS location access denied or unavailable.");
+      },
+      { timeout: 10000, enableHighAccuracy: true }
+    );
+  });
+
+  /* ── Radius Filter Buttons ─────────────────────────────────────────── */
+  document.querySelectorAll('.radius-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+      document.querySelectorAll('.radius-btn').forEach(b => b.classList.remove('active'));
+      this.classList.add('active');
+      currentBuildingRadius = parseInt(this.dataset.radius, 10);
+      loadSurroundingBuildings(currentLoc.lat, currentLoc.lon, currentBuildingRadius);
+      showToast(`Building extraction radius set to ${currentBuildingRadius}m`);
+    });
+  });
+
+  /* ── Live Address Suggestion in Proposal Form ──────────────────────── */
+  const plotAddressBlocks = document.getElementById('plot-address-blocks');
+  const addPlotAddressButton = document.getElementById('add-plot-address');
+  let nextPlotId = 2;
+  const addrDebounceTimers = new WeakMap();
+  const activeAddressSearches = new WeakMap();
+
+  function getPlotBlocks() {
+    return Array.from(plotAddressBlocks.querySelectorAll('[data-plot-block]'));
+  }
+
+  function getActivePlotBlock() {
+    return activePlotBlock?.isConnected ? activePlotBlock : getPlotBlocks()[0] || null;
+  }
+
+  function updatePlotBlockLabels() {
+    getPlotBlocks().forEach((block, index) => {
+      const reference = block.querySelector('.plot-address-reference').value.trim();
+      block.querySelector('.plot-address-title').textContent = reference || `Plot ${index + 1}`;
+      block.querySelector('.remove-plot-address').hidden = index === 0;
+      block.querySelector('.plot-address-input').setAttribute('aria-label', `Plot ${index + 1} address`);
+    });
+  }
+
+  function applyJurisdictionMatch(block, match) {
+    const citySelect = block.querySelector('.plot-city-select');
+    const cityName = String(match.city || '').trim().toLowerCase();
+    const option = Array.from(citySelect.options).find(item => {
+      const optionName = item.value.toLowerCase();
+      return cityName && (optionName === cityName || cityName.includes(optionName) || optionName.includes(cityName));
+    });
+    if (option) citySelect.value = option.value;
+  }
+
+  function syncPrimaryMapToAddress(match) {
+    inspMap.setView([match.lat, match.lon], 16);
+    inspectCoordinates(match.lat, match.lon, false);
+    currentLoc.label = match.label;
+    currentLoc.city = match.city || match.state || 'India';
+    document.getElementById('site-display-title').textContent = match.label.split(',')[0];
+    document.getElementById('site-display-detail').textContent = match.label;
+    document.getElementById('tag-city').textContent = match.city || match.state || 'India';
+    document.getElementById('tag-coords').textContent = `${Number(match.lat).toFixed(4)}°N, ${Number(match.lon).toFixed(4)}°E`;
+  }
+
+  function attachPlotAddressBlock(block) {
+    const input = block.querySelector('.plot-address-input');
+    const latitude = block.querySelector('.plot-latitude');
+    const longitude = block.querySelector('.plot-longitude');
+    const suggestions = block.querySelector('.address-suggestions-box');
+
+    input.addEventListener('focus', () => { activePlotBlock = block; });
+
+    input.addEventListener('input', function() {
+      clearTimeout(addrDebounceTimers.get(input));
+      activeAddressSearches.get(input)?.abort();
+      latitude.value = '';
+      longitude.value = '';
+      delete input.dataset.city;
+      delete input.dataset.matchMode;
+      delete input.dataset.matchedQuery;
+      delete input.dataset.matchLabel;
+      suggestions.classList.remove('visible');
+      const queryText = input.value.trim();
+      if (queryText.length < 3) {
+        suggestions.innerHTML = '';
+        return;
+      }
+      if (queryText.length > 500) {
+        suggestions.innerHTML = `<div style="padding:10px;font-size:12px;color:var(--danger);">Address is too long. Keep it under 500 characters.</div>`;
+        suggestions.classList.add('visible');
+        return;
+      }
+      suggestions.innerHTML = `<div style="padding:10px 12px;font-size:12px;color:var(--text-muted);">Searching address matches…</div>`;
+      suggestions.classList.add('visible');
+      const timer = setTimeout(async () => {
+        const controller = new AbortController();
+        activeAddressSearches.set(input, controller);
+        try {
+          const response = await fetch(`/api/address-check?q=${encodeURIComponent(queryText)}&limit=5`, { signal: controller.signal });
+          const data = await response.json();
+          if (!response.ok) throw new Error(data.error || `Address search failed (${response.status}).`);
+          if (input.value.trim() !== queryText || !block.isConnected) return;
+          const matches = data.results || [];
+          suggestions.innerHTML = matches.length ? matches.map((match, index) => `
+            <button class="suggestion-row" type="button" data-idx="${index}">
+              <strong>${escapeHtml(match.label)}</strong>
+              <small>${match.match_mode === 'broader' ? `Broader match for: ${escapeHtml(match.matched_query || '')} · ` : ''}${escapeHtml([match.city, match.state, match.postcode].filter(Boolean).join(' · ') || 'India')}</small>
+            </button>
+          `).join('') : `<div style="padding:10px 12px;font-size:12px;color:var(--text-secondary);">No location match found. Try removing flat or floor details and keep the locality, city, PIN code, and country. The search also tries broader locality matches for complex addresses.</div>`;
+          suggestions.querySelectorAll('.suggestion-row').forEach(row => {
+            row.addEventListener('click', () => {
+              const match = matches[Number(row.dataset.idx)];
+              input.value = match.label;
+              latitude.value = match.lat;
+              longitude.value = match.lon;
+              input.dataset.city = match.city || '';
+              input.dataset.matchMode = match.match_mode || 'full';
+              input.dataset.matchedQuery = match.matched_query || '';
+              input.dataset.matchLabel = match.label || '';
+              applyJurisdictionMatch(block, match);
+              suggestions.classList.remove('visible');
+              activePlotBlock = block;
+              syncPrimaryMapToAddress(match);
+              const plotLabel = block.querySelector('.plot-address-title').textContent;
+              showToast(match.match_mode === 'broader'
+                ? `${plotLabel} matched to a broader area. Verify the exact plot point on the map.`
+                : `${plotLabel} location updated on the satellite map.`);
+            });
+          });
+          suggestions.classList.add('visible');
+        } catch (error) {
+          if (error.name !== 'AbortError' && input.value.trim() === queryText) {
+            suggestions.innerHTML = `<div style="padding:10px 12px;font-size:12px;color:var(--danger);">${escapeHtml(error.message || 'Address search is unavailable. You can still enter the full address.')}</div>`;
+            suggestions.classList.add('visible');
+          }
+        }
+      }, 1000);
+      addrDebounceTimers.set(input, timer);
+    });
+
+    input.addEventListener('keydown', event => {
+      if (event.key === 'Enter' && suggestions.classList.contains('visible')) {
+        const firstSuggestion = suggestions.querySelector('.suggestion-row');
+        if (firstSuggestion) {
+          event.preventDefault();
+          firstSuggestion.click();
+        }
+      }
+    });
+
+    block.querySelector('.remove-plot-address').addEventListener('click', () => {
+      block.remove();
+      if (activePlotBlock === block) activePlotBlock = getPlotBlocks()[0] || null;
+      updatePlotBlockLabels();
+    });
+    block.querySelector('.plot-address-reference').addEventListener('input', updatePlotBlockLabels);
+  }
+
+  function addPlotAddressBlock() {
+    const plotId = nextPlotId++;
+    const block = document.createElement('div');
+    block.className = 'plot-address-block';
+    block.dataset.plotBlock = '';
+    block.dataset.plotId = String(plotId);
+    block.innerHTML = `
+      <div class="plot-address-heading">
+        <strong class="plot-address-title"></strong>
+        <button class="remove-plot-address" type="button">Remove</button>
+      </div>
+      <div class="plot-address-fields">
+        <div class="field-group live-search-wrap">
+          <label for="plot-address-${plotId}">Address or plot location</label>
+          <input id="plot-address-${plotId}" class="plot-address-input" type="search" maxlength="500" placeholder="Enter an Indian address, landmark, or PIN code..." autocomplete="off">
+          <input class="plot-latitude" type="hidden">
+          <input class="plot-longitude" type="hidden">
+          <div class="address-suggestions-box"></div>
+        </div>
+        <div class="field-group">
+          <label for="plot-city-${plotId}">City Jurisdiction</label>
+          <select id="plot-city-${plotId}" class="plot-city-select"></select>
+        </div>
+        <div class="field-group">
+          <label for="plot-reference-${plotId}">Block / plot reference</label>
+          <input id="plot-reference-${plotId}" class="plot-address-reference" type="text" maxlength="80" placeholder="e.g. Block A - Plot 14">
+        </div>
+      </div>
+    `;
+    const citySelect = block.querySelector('.plot-city-select');
+    const cityOptions = Array.from(document.querySelectorAll('#form-city option'));
+    cityOptions.forEach(option => citySelect.add(option.cloneNode(true)));
+    citySelect.value = document.getElementById('form-city').value;
+    plotAddressBlocks.appendChild(block);
+    attachPlotAddressBlock(block);
+    updatePlotBlockLabels();
+    block.querySelector('.plot-address-input').focus();
+  }
+
+  document.querySelectorAll('[data-plot-block]').forEach(attachPlotAddressBlock);
+  let activePlotBlock = getPlotBlocks()[0] || null;
+  addPlotAddressButton.addEventListener('click', addPlotAddressBlock);
+  document.addEventListener('click', e => {
+    if (!e.target.closest('.live-search-wrap')) {
+      document.querySelectorAll('.address-suggestions-box.visible').forEach(box => box.classList.remove('visible'));
+    }
+  });
+
+  /* ── Satellite AI & Spatial Intelligence Execution ─────────────────── */
+  const btnRunAi = document.getElementById('btn-run-satellite-ai');
+  const aiReportText = document.getElementById('ai-analysis-text');
+
+  btnRunAi.addEventListener('click', async function() {
+    btnRunAi.disabled = true;
+    btnRunAi.innerHTML = `<span>⏳ Analysing Site &amp; Satellite Data...</span>`;
+    aiReportText.innerHTML = `Retrieving 250m satellite snapshot from ArcGIS World Imagery and executing spatial morphology screening...`;
+
+    try {
+      const res = await fetch('/api/satellite-analysis', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          lat: currentLoc.lat,
+          lon: currentLoc.lon,
+          address: currentLoc.label
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Analysis failed.");
+
+      // Formatted text
+      const formatted = escapeHtml(String(data.analysis || ''))
+        .replace(/\*\*(.+?)\*\*/g, '<strong style="color:var(--accent);display:block;margin-top:12px;font-size:14px;">$1</strong>')
+        .replace(/^•\s*(.+)$/gm, '• $1')
+        .replace(/\n/g, '<br>');
+
+      aiReportText.innerHTML = `
+        <div style="margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,0.08);padding-bottom:8px;">
+          <span style="font-weight:700;color:var(--text-primary);">Inspection Report</span>
+          <span style="font-size:11px;color:var(--accent-blue);font-weight:600;">Engine: ${escapeHtml(data.model || 'Spatial Intelligence')}</span>
+        </div>
+        ${formatted}
+      `;
+      showToast("Satellite analysis complete!");
+    } catch (e) {
+      aiReportText.innerHTML = `<span style="color:var(--danger);">Error: ${escapeHtml(e.message)}</span>`;
+      showToast(`Analysis failed: ${e.message}`);
+    } finally {
+      btnRunAi.disabled = false;
+      btnRunAi.innerHTML = `<span>Generate site context report</span>`;
+    }
+  });
+
+  /* ── Feasibility Proposal Form Submission ──────────────────────────── */
+  const propForm = document.getElementById('proposal-form');
+  const btnSubmit = document.getElementById('btn-submit-form');
+  const resultsDiv = document.getElementById('results');
+  let violationAssessmentRecords = [];
+
+  const NUM_FIELDS = [
+    'plot_size_sqm', 'road_width_m', 'far_proposed', 'height_proposed_m', 'floors',
+    'ground_coverage_pct', 'setback_front_m', 'setback_rear_m', 'setback_side_m',
+    'parking_provided_ecs', 'foundation_depth_m', 'gis_record_confidence'
+  ];
+
+  async function resolveAssessmentLocation(block, useMapFallback = false) {
+    const input = block.querySelector('.plot-address-input');
+    const latitude = block.querySelector('.plot-latitude');
+    const longitude = block.querySelector('.plot-longitude');
+    const citySelect = block.querySelector('.plot-city-select');
+    let address = input.value.trim();
+    let lat = latitude.value.trim() ? Number(latitude.value) : NaN;
+    let lon = longitude.value.trim() ? Number(longitude.value) : NaN;
+
+    if (Number.isFinite(lat) && Number.isFinite(lon) && address) {
+      return {
+        lat, lon, address, city: citySelect.value,
+        matchMode: input.dataset.matchMode || 'full',
+        matchLabel: input.dataset.matchLabel || ''
+      };
+    }
+
+    if (address) {
+      const response = await fetch(`/api/geocode?q=${encodeURIComponent(address)}&limit=1`);
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Could not resolve this plot address.');
+      const match = (data.results || [])[0];
+      if (!match) throw new Error('No location match found. Try keeping the locality, city, PIN code, and country, or refine the address.');
+      lat = Number(match.lat);
+      lon = Number(match.lon);
+      const originalAddress = address;
+      input.dataset.matchMode = match.match_mode || 'full';
+      input.dataset.matchedQuery = match.matched_query || '';
+      input.dataset.matchLabel = match.label || '';
+      input.dataset.city = match.city || '';
+      latitude.value = lat;
+      longitude.value = lon;
+      applyJurisdictionMatch(block, match);
+      activePlotBlock = block;
+      syncPrimaryMapToAddress(match);
+      return { lat, lon, address: originalAddress, city: citySelect.value, matchMode: input.dataset.matchMode, matchLabel: input.dataset.matchLabel };
+    }
+
+    if (!useMapFallback) throw new Error('Enter an address for this plot, or remove the empty plot card.');
+    address = currentLoc.label || 'Selected map location';
+    lat = Number(currentLoc.lat);
+    lon = Number(currentLoc.lon);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+      throw new Error('Choose a site on the map or enter a plot address before running the assessment.');
+    }
+    input.value = address;
+    latitude.value = lat;
+    longitude.value = lon;
+    return { lat, lon, address, city: citySelect.value, matchMode: 'map', matchLabel: '' };
+  }
+
+  propForm.addEventListener('submit', async function(e) {
+    e.preventDefault();
+    btnSubmit.disabled = true;
+    btnSubmit.innerHTML = `<span>Preparing plot assessments…</span>`;
+    violationAssessmentRecords = [];
+    renderViolationsActions(violationAssessmentRecords);
+
+    const formData = new FormData(propForm);
+    const sharedPayload = Object.fromEntries(formData.entries());
+    delete sharedPayload.site_address;
+    delete sharedPayload.site_latitude;
+    delete sharedPayload.site_longitude;
+    NUM_FIELDS.forEach(field => { sharedPayload[field] = Number(sharedPayload[field]); });
+    sharedPayload.basement_proposed = propForm.elements.basement_proposed.checked;
+
+    const allBlocks = getPlotBlocks();
+    const enteredBlocks = allBlocks.filter(block => block.querySelector('.plot-address-input').value.trim());
+    const assessmentBlocks = enteredBlocks.length ? enteredBlocks : [allBlocks[0]];
+    resultsDiv.innerHTML = assessmentBlocks.map((block, index) => {
+      const address = block.querySelector('.plot-address-input').value.trim() || currentLoc.label || 'Selected map location';
+      const plotLabel = block.querySelector('.plot-address-title').textContent;
+      return `
+        <section class="plot-results-block" id="plot-result-${escapeHtml(block.dataset.plotId)}">
+          <header class="plot-results-heading">
+            <div><h3>${escapeHtml(address)}</h3><p>Separate site review · shared building proposal values</p></div>
+            <span class="plot-results-number">${escapeHtml(plotLabel)}</span>
+          </header>
+          <div class="plot-result-content"><div class="outcome-card"><div class="outcome-subtext">Waiting for assessment…</div></div></div>
+        </section>
+      `;
+    }).join('');
+    resultsDiv.classList.add('visible');
+    resultsDiv.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+    let completed = 0;
+    for (let index = 0; index < assessmentBlocks.length; index++) {
+      const block = assessmentBlocks[index];
+      const resultCard = document.getElementById(`plot-result-${block.dataset.plotId}`);
+      const content = resultCard.querySelector('.plot-result-content');
+      btnSubmit.innerHTML = `<span>Reviewing plot ${index + 1} of ${assessmentBlocks.length}…</span>`;
+      try {
+        const site = await resolveAssessmentLocation(block, assessmentBlocks.length === 1 && !enteredBlocks.length);
+        resultCard.querySelector('.plot-results-heading h3').textContent = site.address;
+        if (site.matchMode === 'broader') {
+          resultCard.querySelector('.plot-results-heading p').textContent = `Broader map match: ${site.matchLabel || 'locality result'}. Confirm the exact plot position before relying on this review.`;
+        }
+        const payload = { ...sharedPayload, city: site.city, lat: site.lat, lon: site.lon, address: site.address };
+        const response = await fetch('/api/site-assessment', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Assessment failed.');
+        content.innerHTML = renderAssessmentResults(data.assessment, data.satellite, data.site);
+        violationAssessmentRecords.push({
+          plotLabel: block.querySelector('.plot-address-title').textContent,
+          address: site.address,
+          assessment: data.assessment
+        });
+        renderViolationsActions(violationAssessmentRecords);
+        completed++;
+      } catch (error) {
+        content.innerHTML = `
+          <div class="outcome-card review">
+            <div class="outcome-heading">Could Not Complete This Plot Review</div>
+            <div class="outcome-subtext">${escapeHtml(error.message)}</div>
+          </div>
+        `;
+      }
+    }
+    if (completed) showToast(`Completed ${completed} of ${assessmentBlocks.length} plot review${assessmentBlocks.length === 1 ? '' : 's'}.`);
+    else showToast('No plot assessments completed. Check the address entries and try again.');
+    btnSubmit.disabled = false;
+    btnSubmit.innerHTML = `<span>Run Combined Site Assessment</span> <span>&#8594;</span>`;
+  });
+
+  function renderViolationsActions(records) {
+    const summary = document.getElementById('violations-actions-summary');
+    const content = document.getElementById('violations-actions-content');
+    if (!records.length) {
+      summary.textContent = 'Run a site assessment to see plot-specific flags and recommended actions.';
+      content.innerHTML = '';
+      return;
+    }
+
+    const flaggedItems = records.reduce((total, record) => {
+      return total + (record.assessment.bns_legal_analysis?.infringements || []).length;
+    }, 0);
+    summary.textContent = `${records.length} plot${records.length === 1 ? '' : 's'} assessed · ${flaggedItems} possible review item${flaggedItems === 1 ? '' : 's'}.`;
+    content.innerHTML = records.map(record => {
+      const items = record.assessment.bns_legal_analysis?.infringements || [];
+      const actions = items.length ? items.map(item => `
+        <article class="violation-action-item">
+          <h4>${escapeHtml(item.title || (item.violation_key || 'Review item').replaceAll('_', ' '))}</h4>
+          <p>${escapeHtml(item.description || 'Verify this screening flag against the current local requirements and site-specific evidence.')}</p>
+          ${item.bns_sections?.length ? `
+            <h5>Conditional BNS provisions</h5>
+            <div class="violation-law-list">
+              ${item.bns_sections.map(section => `
+                <div class="violation-law-item">
+                  <strong>${escapeHtml(section.section)} · ${escapeHtml(section.title)}</strong>
+                  <p>${escapeHtml(section.legal_rationale)}</p>
+                </div>
+              `).join('')}
+            </div>
+          ` : ''}
+          <h5>Planning and safety steps</h5>
+          <ul>${(item.actions_taken || []).map(action => `<li>${escapeHtml(action)}</li>`).join('')}</ul>
+        </article>
+      `).join('') : '<p class="violations-empty-state">No review items were returned for this plot. This is not confirmation of statutory compliance.</p>';
+
+      return `
+        <section class="violation-plot-group">
+          <header class="violation-plot-heading">
+            <div><h3>${escapeHtml(record.plotLabel)}</h3><p>${escapeHtml(record.address)}</p></div>
+            <span class="violation-count-badge ${items.length ? '' : 'clear'}">${items.length} possible item${items.length === 1 ? '' : 's'}</span>
+          </header>
+          <div class="violation-action-list">${actions}</div>
+        </section>
+      `;
+    }).join('') + `
+      <section class="legal-followup-panel">
+        <h3>Considering a complaint against a builder?</h3>
+        <p>A screening flag is not evidence of an offence. The BNS sections above are conditional references; each applies only if its legal ingredients are supported by facts.</p>
+        <ol>
+          <li>Preserve the sanctioned plan, permits, agreements, dated correspondence, notices, survey reports, photographs, and records of any actual damage.</li>
+          <li>Ask an independent licensed architect, engineer, or surveyor to compare the construction with approvals and applicable local rules.</li>
+          <li>Have an Indian advocate assess the evidence against the exact BNS section and identify the competent authority.</li>
+          <li>If the evidence supports suspected criminal conduct, ask the advocate about making a factual complaint to the appropriate police authority. Criminal procedure, including complaint and investigation processes, is governed by the Bharatiya Nagarik Suraksha Sanhita (BNSS); planning or permit issues may also be reported separately to the local planning authority.</li>
+        </ol>
+        <p>This page does not determine guilt, recommend a charge, or replace advice from an advocate or the competent authority.</p>
+      </section>
+    `;
+  }
+
+  function renderAssessmentResults(res, satellite, site) {
+    const isFeasible = !!res.feasible;
+    const cls = isFeasible ? 'good' : 'review';
+    const risk = Math.max(0, Math.min(1, Number(res.utility_conflict_probability) || 0));
+    const riskCls = risk < 0.33 ? 'low' : (risk < 0.66 ? 'med' : 'high');
+    const riskLbl = risk < 0.33 ? 'Lower Sub-surface Risk' : (risk < 0.66 ? 'Moderate Utility Risk' : 'Elevated Conflict Risk');
+    const p = res.proposal || {};
+    const violCount = Object.values(res.violations || {}).filter(Boolean).length;
+    const reasons = (res.reasons || []).map(r => `<li style="margin-left:18px;list-style:disc;margin-bottom:6px;">${escapeHtml(r)}</li>`).join('');
+
+    let bnsHtml = '';
+    const bns = res.bns_legal_analysis;
+    if (bns) {
+      const items = bns.infringements || [];
+      if (items.length) {
+        const infringementsHtml = items.map(inf => {
+          const sectionsHtml = (inf.bns_sections || []).map(sec => `
+            <div class="bns-sec-item">
+              <div class="bns-sec-header">
+                <span class="bns-sec-tag">${escapeHtml(sec.section)}</span>
+                <strong class="bns-sec-name">${escapeHtml(sec.title)}</strong>
+              </div>
+              <p class="bns-rationale">${escapeHtml(sec.legal_rationale)}</p>
+            </div>
+          `).join('');
+          const actsHtml = (inf.special_acts || []).map(act => `<li>${escapeHtml(act)}</li>`).join('');
+          const actionsHtml = (inf.actions_taken || []).map(act => `<li>${escapeHtml(act)}</li>`).join('');
+          return `
+            <article class="bns-infringement-card">
+              <div class="bns-inf-title-row">
+                <h4>${escapeHtml(inf.title)}</h4>
+                <span class="bns-viol-tag">${escapeHtml(inf.violation_key.replaceAll('_', ' '))}</span>
+              </div>
+              <p class="bns-inf-desc">${escapeHtml(inf.description)}</p>
+              <div class="bns-subhead">Conditional BNS references · verify statutory elements</div>
+              <div class="bns-sections-list">${sectionsHtml}</div>
+              <div class="bns-two-col">
+                <div class="bns-col-box">
+                  <div class="bns-subhead-sm">Planning rules to check</div>
+                  <ul class="bns-list-clean">${actsHtml}</ul>
+                </div>
+                <div class="bns-col-box">
+                  <div class="bns-subhead-sm">Recommended next steps</div>
+                  <ul class="bns-list-clean actions">${actionsHtml}</ul>
+                </div>
+              </div>
+            </article>
+          `;
+        }).join('');
+        bnsHtml = `
+          <section class="bns-panel alert-liability">
+            <div class="bns-main-header">
+              <div class="bns-title-wrap">
+                <span class="bns-gavel-icon">§</span>
+                <div>
+                  <h3 class="bns-panel-title">Potential BNS references and actions</h3>
+                  <p class="bns-panel-subtitle">Planning flags from the model, with criminal-code references only where additional facts may satisfy the law.</p>
+                </div>
+              </div>
+              <div class="bns-liability-pill liability">${escapeHtml(bns.status)}</div>
+            </div>
+            <p class="bns-summary-bar">${escapeHtml(bns.summary)}</p>
+            <div class="bns-infringements-grid">${infringementsHtml}</div>
+            <p class="result-disclaimer">${escapeHtml(bns.disclaimer || 'Screening output only. Confirm the current law and facts with the competent authority or a qualified advocate.')}
+              <a href="https://www.indiacode.nic.in/bitstream/123456789/20062/1/a2023-45.pdf" target="_blank" rel="noopener noreferrer">Official BNS text · India Code</a>
+            </p>
+          </section>
+        `;
+      } else {
+        bnsHtml = `
+          <section class="bns-panel compliant">
+            <div class="bns-main-header">
+              <div class="bns-title-wrap">
+                <span class="bns-gavel-icon">§</span>
+                <div>
+                  <h3 class="bns-panel-title">No planning flags returned</h3>
+                  <p class="bns-panel-subtitle">This model result does not confirm statutory compliance or rule out an offence.</p>
+                </div>
+              </div>
+              <div class="bns-liability-pill compliant">${escapeHtml(bns.status)}</div>
+            </div>
+            <p class="bns-summary-bar">${escapeHtml(bns.summary)}</p>
+            <p class="result-disclaimer">${escapeHtml(bns.disclaimer || 'Verify the proposal against current local rules and site evidence.')}
+              <a href="https://www.indiacode.nic.in/bitstream/123456789/20062/1/a2023-45.pdf" target="_blank" rel="noopener noreferrer">Official BNS text · India Code</a>
+            </p>
+          </section>
+        `;
+      }
+    }
+
+    const siteLat = Number(site?.lat);
+    const siteLon = Number(site?.lon);
+    const satelliteReport = satellite?.analysis
+      ? escapeHtml(satellite.analysis).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>').replace(/^•\s*(.+)$/gm, '• $1').replace(/\n/g, '<br>')
+      : escapeHtml(satellite?.error || 'Satellite observations could not be retrieved for this run. Project-data screening is shown below.');
+    const evidenceHtml = Number.isFinite(siteLat) && Number.isFinite(siteLon) ? `
+      <section class="combined-evidence-card">
+        <div class="combined-evidence-image">
+          <img src="/api/satellite-preview?lat=${encodeURIComponent(siteLat)}&amp;lon=${encodeURIComponent(siteLon)}" alt="Satellite imagery for ${escapeHtml(site?.address || 'selected site')}">
+        </div>
+        <div class="combined-evidence-copy">
+          <h3>Satellite context and proposal</h3>
+          <div class="combined-site-meta">${escapeHtml(site?.address || 'Selected site')} · ${siteLat.toFixed(5)}, ${siteLon.toFixed(5)} · ${escapeHtml(satellite?.model || 'Site screening')}</div>
+          <div class="assessment-input-summary">
+            <span>${escapeHtml(p.city || '')} · ${escapeHtml(p.zone_type || '')}</span>
+            <span>Plot ${escapeHtml(p.plot_size_sqm)} m²</span>
+            <span>Road ${escapeHtml(p.road_width_m)} m</span>
+            <span>FAR ${escapeHtml(p.far_proposed)}</span>
+            <span>Height ${escapeHtml(p.height_proposed_m)} m</span>
+            <span>${escapeHtml(p.floors)} floors</span>
+            <span>Coverage ${escapeHtml(p.ground_coverage_pct)}%</span>
+            <span>Setbacks ${escapeHtml(p.setback_front_m)} / ${escapeHtml(p.setback_rear_m)} / ${escapeHtml(p.setback_side_m)} m</span>
+            <span>Parking ${escapeHtml(p.parking_provided_ecs)} ECS</span>
+            <span>Foundation ${escapeHtml(p.foundation_depth_m)} m · ${p.basement_proposed ? 'basement proposed' : 'no basement'}</span>
+          </div>
+          <p>${satelliteReport}</p>
+          ${satellite?.disclaimer ? `<p class="combined-site-meta">${escapeHtml(satellite.disclaimer)}</p>` : ''}
+        </div>
+      </section>
+    ` : '';
+    return `
+      ${evidenceHtml}
+
+      <div class="outcome-card ${cls}">
+        <div class="outcome-top">
+          <div class="outcome-heading">${escapeHtml(res.decision)}</div>
+          <span class="outcome-badge-pill ${cls}">${isFeasible ? 'No model flags returned' : 'Review recommended'}</span>
+        </div>
+        <div class="outcome-subtext">
+          ${isFeasible
+            ? 'The screening returned no review flags. This is not a determination of statutory compliance.'
+            : 'One or more planning benchmarks or subsurface risk signals need verification against current rules and site evidence.'}
+        </div>
+      </div>
+
+      <div class="results-metric-grid">
+        <div class="res-metric-box">
+          <small>Utility Conflict Risk</small>
+          <div class="res-metric-val">${(risk * 100).toFixed(0)}%</div>
+          <div class="risk-meter"><div class="risk-fill ${riskCls}" style="width:${risk * 100}%"></div></div>
+          <span style="font-size:11.5px;color:var(--text-secondary);">${riskLbl}</span>
+        </div>
+
+        <div class="res-metric-box">
+          <small>Planning flags</small>
+          <div class="res-metric-val">${violCount}</div>
+          <span style="font-size:11.5px;color:var(--text-secondary);">${violCount === 0 ? 'No model flags returned' : 'Needs verification'}</span>
+        </div>
+
+        <div class="res-metric-box">
+          <small>Built-up Area (sq m)</small>
+          <div class="res-metric-val">${Number(p.built_up_area_sqm || 0).toLocaleString()}</div>
+          <span style="font-size:11.5px;color:var(--text-secondary);">Footprint: ${Number(p.footprint_sqm || 0).toLocaleString()} sq m</span>
+        </div>
+
+        <div class="res-metric-box">
+          <small>Estimated FAR benchmark</small>
+          <div class="res-metric-val">${p.far_proposed} <span style="font-size:16px;color:var(--text-muted);">/ max ${p.far_permissible}</span></div>
+          <span style="font-size:11.5px;color:var(--text-secondary);">Estimated height benchmark: ${p.height_permissible_m}m</span>
+        </div>
+      </div>
+
+      <div class="form-panel-grid">
+        <div class="panel-box">
+          <h3 style="font-size:15px;color:var(--text-primary);margin-bottom:12px;">Screening findings</h3>
+          <ul style="color:var(--text-secondary);font-size:13px;line-height:1.6;">${reasons}</ul>
+        </div>
+
+        <div class="panel-box">
+          <h3 style="font-size:15px;color:var(--text-primary);margin-bottom:12px;">Estimated benchmark comparison</h3>
+          <table class="bench-table">
+            <tr><td>Estimated FAR benchmark</td><td>${p.far_permissible}</td></tr>
+            <tr><td>Estimated height benchmark</td><td>${p.height_permissible_m} m</td></tr>
+            <tr><td>Proposed ground coverage</td><td>${p.ground_coverage_pct}% (${Number(p.footprint_sqm || 0).toLocaleString()} sq m)</td></tr>
+            <tr><td>Estimated parking</td><td>${p.parking_required_ecs} ECS indicated (${p.parking_provided_ecs} provided)</td></tr>
+          </table>
+        </div>
+      </div>
+
+      ${bnsHtml}
+    `;
+  }
+
+  /* ── Initial Boot ──────────────────────────────────────────────────── */
+  initMap();
+  renderTrackedSites();
+  updateVisionApiStatus();
+</script>
+</body>
+</html>

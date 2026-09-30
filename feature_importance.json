@@ -1,0 +1,70 @@
+{
+  "model_a_compliance": [
+    {
+      "feature": "ground_coverage_pct",
+      "importance": 0.1448
+    },
+    {
+      "feature": "far_proposed",
+      "importance": 0.1249
+    },
+    {
+      "feature": "setback_rear_m",
+      "importance": 0.0817
+    },
+    {
+      "feature": "parking_provided_ecs",
+      "importance": 0.0782
+    },
+    {
+      "feature": "height_proposed_m",
+      "importance": 0.072
+    },
+    {
+      "feature": "setback_side_m",
+      "importance": 0.0705
+    },
+    {
+      "feature": "setback_front_m",
+      "importance": 0.0659
+    },
+    {
+      "feature": "parking_required_ecs",
+      "importance": 0.0553
+    }
+  ],
+  "model_b_utility_conflict": [
+    {
+      "feature": "foundation_depth_m",
+      "importance": 0.2515
+    },
+    {
+      "feature": "plot_size_sqm",
+      "importance": 0.1417
+    },
+    {
+      "feature": "built_up_area_sqm",
+      "importance": 0.1415
+    },
+    {
+      "feature": "gis_record_confidence",
+      "importance": 0.114
+    },
+    {
+      "feature": "floors",
+      "importance": 0.0721
+    },
+    {
+      "feature": "road_width_m",
+      "importance": 0.0641
+    },
+    {
+      "feature": "basement_proposed",
+      "importance": 0.0626
+    },
+    {
+      "feature": "zone_type_Residential",
+      "importance": 0.0137
+    }
+  ]
+}
