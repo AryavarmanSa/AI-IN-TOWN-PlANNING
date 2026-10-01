@@ -1,0 +1,8 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "functions": {
+    "wsgi.py": {
+      "excludeFiles": "{.venv/**,data/**,train_model.py,generate_dataset.py,app.py,web_app.py,model_a_compliance.joblib,model_b_utility_conflict.joblib,feature_importance.json}"
+    }
+  }
+}

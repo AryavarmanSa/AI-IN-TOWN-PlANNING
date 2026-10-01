@@ -27,6 +27,7 @@ from generate_dataset import CITIES, ZONES
 
 PROJECT_DIR = Path(__file__).resolve().parent
 FRONTEND_FILE = PROJECT_DIR / "frontend" / "index.html"
+ASSETS_DIR = PROJECT_DIR / "frontend" / "assets"
 MODELS = None
 
 
