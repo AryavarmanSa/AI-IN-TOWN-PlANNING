@@ -1,5 +1,20 @@
 # CivicLens site review setup
 
+## Deploy on Vercel
+
+Import this repository in Vercel, keep the project root at the repository root, and deploy with the default build settings. The Python WSGI entrypoint serves the frontend and the `/api/*` endpoints from the same origin. Runtime dependencies are listed in `requirements.txt`.
+
+In the Vercel project settings, add `GEMINI_API_KEY` and/or `GEOAPIFY_API_KEY` under **Environment Variables** if you use those services. `CIVICLENS_COUNTRY_CODE` and `GEMINI_MODEL` are optional overrides. Redeploy after changing environment variables. Do not upload `.env` or commit API keys.
+
+You can also deploy from the project directory with the Vercel CLI:
+
+```powershell
+npx vercel
+npx vercel --prod
+```
+
+The first command links the local project and creates a preview deployment; the second publishes to production. The model artifacts in `artifacts/` are required at runtime and are included in the function bundle.
+
 ## Start the app
 
 Copy `.env.example` to `.env` in the project folder, add any keys you want to use, then start the server:
