@@ -10,9 +10,11 @@ provided as a clearer API-oriented alias for integrations.
 """
 
 import base64
+import contextlib
 import json
 import math
 import os
+import socket
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -50,6 +52,10 @@ _load_dotenv(PROJECT_DIR / ".env")
 GEOAPIFY_API_KEY = os.environ.get("GEOAPIFY_API_KEY", "").strip()
 GEOAPIFY_URL = "https://api.geoapify.com/v1/geocode/search"
 GEOCODING_COUNTRY_CODE = os.environ.get("CIVICLENS_COUNTRY_CODE", "in").strip().lower()
+GOOGLE_MAPS_API_KEY = os.environ.get("GOOGLE_MAPS_API_KEY", "").strip()
+GOOGLE_GEOCODING_URL = "https://maps.googleapis.com/maps/api/geocode/json"
+GOOGLE_PLACES_URL = "https://maps.googleapis.com/maps/api/place/autocomplete/json"
+GOOGLE_PLACE_DETAILS_URL = "https://maps.googleapis.com/maps/api/place/details/json"
 NOMINATIM_URL = "https://nominatim.openstreetmap.org/search"
 _NOMINATIM_LOCK = Lock()
 _NOMINATIM_LAST_REQUEST = 0.0
@@ -235,7 +241,9 @@ def _geocode_nominatim(query, limit=5):
                 addr.get("city")
                 or addr.get("town")
                 or addr.get("village")
+                or addr.get("municipality")
                 or addr.get("county")
+                or addr.get("state_district")
             )
             label = item.get("display_name") or search_text
             results.append(
@@ -254,6 +262,61 @@ def _geocode_nominatim(query, limit=5):
             )
         if results:
             break
+    return results
+
+def _geocode_google(query, limit=5):
+    """Geocode an Indian address using Google Maps Geocoding API."""
+    if not GOOGLE_MAPS_API_KEY:
+        return []
+    query = " ".join(str(query).split())
+    if not query:
+        return []
+    params = urlencode({
+        "address": query,
+        "key": GOOGLE_MAPS_API_KEY,
+        "region": GEOCODING_COUNTRY_CODE,
+        "language": "en",
+    })
+    try:
+        payload = _fetch_json(f"{GOOGLE_GEOCODING_URL}?{params}")
+    except ExternalServiceError:
+        return []
+    status = payload.get("status")
+    if status not in ("OK", "ZERO_RESULTS"):
+        return []
+    results = []
+    for item in (payload.get("results") or [])[:limit]:
+        loc = (item.get("geometry") or {}).get("location") or {}
+        lat = loc.get("lat")
+        lng = loc.get("lng")
+        if lat is None or lng is None:
+            continue
+        components = item.get("address_components") or []
+        city = ""
+        state = ""
+        postcode = ""
+        for comp in components:
+            types = comp.get("types") or []
+            if "locality" in types and not city:
+                city = comp.get("long_name", "")
+            elif "administrative_area_level_2" in types and not city:
+                city = comp.get("long_name", "")
+            if "administrative_area_level_1" in types:
+                state = comp.get("long_name", "")
+            if "postal_code" in types:
+                postcode = comp.get("long_name", "")
+        results.append({
+            "label": item.get("formatted_address") or query,
+            "lat": float(lat),
+            "lon": float(lng),
+            "bbox": None,
+            "result_type": (item.get("types") or ["address"])[0],
+            "city": city,
+            "state": state,
+            "postcode": postcode,
+            "match_mode": "full",
+            "matched_query": query,
+        })
     return results
 
 
@@ -337,18 +400,23 @@ def _geocode_geoapify(query, limit=5):
 
 
 def geocode_places(query, limit=5):
-    """Search places. Uses Geoapify if configured, otherwise Nominatim (free)."""
+    """Search places. Uses Google Maps if configured, then Geoapify, then Nominatim (free)."""
     query = str(query or "").strip()
     if len(query) > 500:
         raise ValueError("Address is too long. Keep it under 500 characters.")
+    if GOOGLE_MAPS_API_KEY:
+        try:
+            results = _geocode_google(query, limit)
+            if results:
+                return results
+        except ExternalServiceError:
+            pass
     if GEOAPIFY_API_KEY:
         try:
             results = _geocode_geoapify(query, limit)
             if results:
                 return results
         except ExternalServiceError:
-            # Keep address lookup usable when the optional provider is down or
-            # cannot resolve a detailed address; Nominatim remains the fallback.
             pass
     return _geocode_nominatim(query, limit)
 
@@ -365,7 +433,14 @@ def address_check(query, limit=5):
 
 
 def geocoder_status():
-    """Return geocoding provider status. Nominatim works with no configuration."""
+    """Return geocoding provider status."""
+    if GOOGLE_MAPS_API_KEY:
+        return {
+            "configured": True,
+            "valid": True,
+            "provider": "Google Maps",
+            "country_code": GEOCODING_COUNTRY_CODE,
+        }
     if GEOAPIFY_API_KEY:
         try:
             _geocode_geoapify("India", limit=1)
@@ -708,35 +783,49 @@ def validate_payload(payload):
 
 class RequestHandler(BaseHTTPRequestHandler):
     server_version = "CivicLensAPI/1.0"
+    protocol_version = "HTTP/1.1"
+
+    def end_headers(self):
+        self.send_header("Connection", "close")
+        super().end_headers()
 
     def _send_json(self, payload, status=200):
         body = json.dumps(payload).encode("utf-8")
-        self.send_response(status)
-        self.send_header("Content-Type", "application/json; charset=utf-8")
-        self.send_header("Content-Length", str(len(body)))
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
-        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        self.end_headers()
-        self.wfile.write(body)
+        try:
+            self.send_response(status)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.send_header("Access-Control-Allow-Headers", "Content-Type")
+            self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS, HEAD")
+            self.end_headers()
+            self.wfile.write(body)
+        except (ConnectionResetError, ConnectionAbortedError, BrokenPipeError):
+            pass
 
     def _send_bytes(self, body, content_type, status=200):
-        self.send_response(status)
-        self.send_header("Content-Type", content_type)
-        self.send_header("Content-Length", str(len(body)))
-        self.send_header("Cache-Control", "private, max-age=300")
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.end_headers()
-        self.wfile.write(body)
+        try:
+            self.send_response(status)
+            self.send_header("Content-Type", content_type)
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Cache-Control", "private, max-age=300")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.wfile.write(body)
+        except (ConnectionResetError, ConnectionAbortedError, BrokenPipeError):
+            pass
 
     def _send_frontend(self):
         body = FRONTEND_FILE.read_bytes()
-        self.send_response(200)
-        self.send_header("Content-Type", "text/html; charset=utf-8")
-        self.send_header("Cache-Control", "no-store, no-cache, must-revalidate")
-        self.send_header("Content-Length", str(len(body)))
-        self.end_headers()
-        self.wfile.write(body)
+        try:
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Cache-Control", "no-store, no-cache, must-revalidate")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+        except (ConnectionResetError, ConnectionAbortedError, BrokenPipeError):
+            pass
 
     def _read_json_body(self):
         content_length = int(self.headers.get("Content-Length", "0"))
@@ -749,6 +838,19 @@ class RequestHandler(BaseHTTPRequestHandler):
 
     def do_OPTIONS(self):
         self._send_json({}, status=204)
+
+    def do_HEAD(self):
+        parsed = urlparse(self.path)
+        path = parsed.path
+        if path in {"/", "/index.html", "/frontend/index.html"}:
+            body = FRONTEND_FILE.read_bytes()
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+        else:
+            self.send_response(200)
+            self.end_headers()
 
     def do_GET(self):
         parsed = urlparse(self.path)
@@ -806,6 +908,12 @@ class RequestHandler(BaseHTTPRequestHandler):
                     },
                     503,
                 )
+            return
+        if path == "/api/gmaps-key":
+            self._send_json({
+                "key": GOOGLE_MAPS_API_KEY,
+                "configured": bool(GOOGLE_MAPS_API_KEY),
+            })
             return
         if path == "/api/gemini-status":
             self._send_json(gemini_status())
@@ -941,18 +1049,34 @@ class RequestHandler(BaseHTTPRequestHandler):
         print(f"{self.address_string()} - {format_string % args}")
 
 
+class DualStackServer(ThreadingHTTPServer):
+    address_family = socket.AF_INET6
+
+    def server_bind(self):
+        with contextlib.suppress(Exception):
+            self.socket.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 0)
+        return super().server_bind()
+
+
 def main():
-    host = os.environ.get("CIVICLENS_HOST", "127.0.0.1")
+    host = os.environ.get("CIVICLENS_HOST", "")
     port = int(os.environ.get("CIVICLENS_PORT", "8000"))
-    server = ThreadingHTTPServer((host, port), RequestHandler)
-    print(f"CivicLens API is running at http://{host}:{port}")
+    if not host or host in {"127.0.0.1", "0.0.0.0", "::", "localhost"}:
+        try:
+            server = DualStackServer(("::", port), RequestHandler)
+        except Exception:
+            server = ThreadingHTTPServer(("0.0.0.0", port), RequestHandler)
+    else:
+        server = ThreadingHTTPServer((host, port), RequestHandler)
+    print(f"CivicLens API is running at http://localhost:{port} (and http://127.0.0.1:{port})", flush=True)
     try:
         server.serve_forever()
     except KeyboardInterrupt:
-        print("\nStopping CivicLens API")
+        print("\nStopping CivicLens API", flush=True)
     finally:
         server.server_close()
 
 
 if __name__ == "__main__":
     main()
+
